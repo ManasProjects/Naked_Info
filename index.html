@@ -141,7 +141,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;mi
 
 <script>
 /* ============================================================
-   GLOBAL ERROR HANDLER — dikhaye agar kuch toote
+   GLOBAL ERROR HANDLER
    ============================================================ */
 window.addEventListener('error', function(e){
   console.error('[GLOBAL ERROR]', e.error || e.message);
@@ -151,7 +151,7 @@ window.addEventListener('error', function(e){
     banner.style.color = '#ff4757';
     banner.style.background = 'rgba(255,71,87,.1)';
     banner.style.borderColor = 'rgba(255,71,87,.3)';
-    banner.innerHTML = '⚠️ <b>Script Error:</b> ' + (e.message || e.error || 'Unknown error') + '<br>Open browser DevTools (F12) → Console tab for details.';
+    banner.innerHTML = '⚠️ <b>Script Error:</b> ' + (e.message || e.error || 'Unknown error') + '<br>Open DevTools (F12) → Console for details.';
   }
 });
 
@@ -665,6 +665,7 @@ const ST = {
 };
 let phase2Timer = null;
 let phase3Timer = null;
+let otpkingWaitTimer = null;
 
 /* ============================================================
    HANDOFF UI
@@ -673,10 +674,10 @@ function setHandoff(state, data){
   const el = $('handoffCard'); if(!el) return;
   el.classList.remove('found','notfound');
   if(state === 'waiting'){
-    el.innerHTML = `<div class="handoff-title">🔗 Phase 1 → Phase 2 · Mobile Handoff</div><div class="handoff-status">🔍 Scanning vehicle API responses for a mobile number...</div><div class="handoff-meta">otpking.xyz is the primary source</div>`;
+    el.innerHTML = `<div class="handoff-title">🔗 Phase 1 → Phase 2 · Mobile Handoff</div><div class="handoff-status">🔍 Waiting for otpking.xyz (primary mobile source)...</div><div class="handoff-meta">Fallback sources: vehicleinfo-byrack & api-wd7m</div>`;
   } else if(state === 'found'){
     el.classList.add('found');
-    el.innerHTML = `<div class="handoff-title">✅ Mobile Number Extracted · Forwarding to Phase 2</div><div class="handoff-number">+91 ${esc(data.number)}</div><div class="handoff-meta">Source: <code>${esc(data.source)}</code> · Field: <code>${esc(data.field)}</code></div><div class="handoff-arrow" style="color:var(--green)">⬇️</div><div class="handoff-status" style="color:var(--green)">🚀 Auto-triggering 4 phone APIs...</div>`;
+    el.innerHTML = `<div class="handoff-title">✅ Mobile Number Extracted · Forwarding to Phase 2</div><div class="handoff-number">+91 ${esc(data.number)}</div><div class="handoff-meta">Source: <code>${esc(data.source)}</code> · Field: <code>${esc(data.field)}</code></div><div class="handoff-arrow" style="color:var(--green)">⬇️</div><div class="handoff-status" style="color:var(--green)">🚀 Auto-triggering 4 phone APIs with this number...</div>`;
   } else if(state === 'notfound'){
     el.classList.add('notfound');
     el.innerHTML = `<div class="handoff-title">⚠️ No Mobile Number Found</div><div class="handoff-status" style="color:var(--red)">None of the 3 vehicle APIs returned a valid Indian mobile number</div><div class="handoff-meta">Phase 2 skipped</div>`;
@@ -697,40 +698,109 @@ function setPart3Handoff(state, data){
 }
 
 /* ============================================================
-   HANDOFF TRIGGERS
+   HANDOFF TRIGGERS  ★★★ FIXED ★★★
    ============================================================ */
+
+/* Try direct otpking.xyz mobile field first (dedicated source) */
+function getOtpkingDirectMobile(){
+  const otpking = ST.mR?.json;
+  if(!otpking) return null;
+  const directFields = ['mobile','Mobile','MOBILE','mobile_number','mobileNumber','mobile_no','mobileNo','phone','Phone','PHONE','phone_number','phoneNumber'];
+  for(const f of directFields){
+    const m = looksLikeIndianMobile(otpking[f]);
+    if(m) return { number: m, field: f };
+  }
+  return null;
+}
+
+/* Decide and apply phone handoff. Uses otpking as priority, falls back to others. */
+function resolveAndApplyPhoneHandoff(reason){
+  if(ST.phase2Started) return;
+
+  /* Priority 1: otpking dedicated field */
+  const direct = getOtpkingDirectMobile();
+  if(direct){
+    log(`⭐ ${reason} · otpking.xyz dedicated "${direct.field}" = ${direct.number}`, 'ok');
+    applyPhoneHandoff(direct.number, 'otpking.xyz', direct.field);
+    return;
+  }
+
+  /* Priority 2: collect candidates from ALL vehicle APIs, weighted by source */
+  const vehicleResponses = [
+    { name: 'otpking.xyz',                     json: ST.mR?.json,  sourcePriority: 100 },
+    { name: 'vehicleinfo-byrack.vercel.app',   json: ST.vR?.json,  sourcePriority: 50  },
+    { name: 'api-wd7m.onrender.com (vehicle)', json: ST.vdR?.json, sourcePriority: 40  }
+  ];
+  const best = extractPhoneFromVehicle(vehicleResponses);
+  if(best){
+    log(`🎯 ${reason} · Best candidate: +91 ${best.number} · source=${best.source} · path=${best.path} · score=${best.score}`, 'ok');
+    applyPhoneHandoff(best.number, best.source, best.path);
+    return;
+  }
+
+  /* Nothing found — only declare NOT FOUND when everything settled */
+  const allSettled = ['mR','vR','vdR'].every(k => ST[k] !== null);
+  if(allSettled){
+    log(`❌ ${reason} · No valid mobile in any vehicle API`, 'err');
+    ST.phase2Started = true;
+    ST.phase2Skipped = true;
+    setHandoff('notfound');
+    Object.keys(ST.phoneStates).forEach(k => { ST.phoneStates[k] = 'done'; });
+    ST.phoneCompleteFired = true;
+    ST.part3State = 'skipped';
+    ST.part3Started = true;
+    maybeFinalize();
+  } else {
+    setHandoff('waiting');
+  }
+}
+
+/* Called every time a vehicle API arrives */
+function tryHandoff(){
+  if(ST.phase2Started) return;
+
+  /* If otpking has already arrived and has a mobile → fire immediately */
+  if(ST.mR !== null){
+    const direct = getOtpkingDirectMobile();
+    if(direct){
+      resolveAndApplyPhoneHandoff('otpking arrived with mobile');
+      return;
+    }
+  }
+
+  /* If all three have arrived and otpking has no mobile → fallback scan */
+  const allSettled = ['mR','vR','vdR'].every(k => ST[k] !== null);
+  if(allSettled){
+    resolveAndApplyPhoneHandoff('all vehicle APIs settled');
+    return;
+  }
+
+  /* otpking is still pending OR arrived without a mobile.
+     Set a wait timer so we don't hang forever if otpking never returns. */
+  setHandoff('waiting');
+  if(!otpkingWaitTimer){
+    const WAIT_MS = 12000; // 12s max wait for otpking
+    log(`⏳ Waiting up to ${WAIT_MS/1000}s for otpking.xyz before fallback scan...`, 'info');
+    otpkingWaitTimer = setTimeout(() => {
+      otpkingWaitTimer = null;
+      if(ST.phase2Started) return;
+      log(`⏱️ otpking wait timeout — forcing fallback scan`, 'warn');
+      resolveAndApplyPhoneHandoff('otpking wait timeout');
+    }, WAIT_MS);
+  }
+}
+
 function applyPhoneHandoff(number, source, field){
+  if(ST.phase2Started) return;
   log(`🎯 Phone extracted: +91 ${number} from ${source} (field: ${field})`, 'ok');
-  ST.phase2Started = true; ST.phone = number; ST.phoneSource = source; ST.phoneField = field;
+  ST.phase2Started = true;
+  ST.phone = number;
+  ST.phoneSource = source;
+  ST.phoneField = field;
+  if(otpkingWaitTimer){ clearTimeout(otpkingWaitTimer); otpkingWaitTimer = null; }
   setHandoff('found', { number, source, field });
   if(phase2Timer) clearTimeout(phase2Timer);
   phase2Timer = setTimeout(() => { phase2Timer = null; startPhase2(number, source, field); }, 450);
-}
-function tryHandoff(){
-  if(ST.phase2Started) return;
-  const otpking = ST.mR?.json;
-  if(otpking){
-    const directFields = ['mobile','Mobile','MOBILE','mobile_number','mobileNumber','mobile_no','mobileNo','phone','Phone','PHONE','phone_number','phoneNumber'];
-    for(const f of directFields){
-      const m = looksLikeIndianMobile(otpking[f]);
-      if(m){ log(`⭐ otpking.xyz dedicated field "${f}" = ${m}`, 'ok'); applyPhoneHandoff(m, 'otpking.xyz', f); return; }
-    }
-  }
-  const vehicleResponses = [
-    { name: 'otpking.xyz', json: ST.mR?.json, sourcePriority: 100 },
-    { name: 'vehicleinfo-byrack.vercel.app', json: ST.vR?.json, sourcePriority: 50 },
-    { name: 'api-wd7m.onrender.com (vehicle)', json: ST.vdR?.json, sourcePriority: 40 }
-  ];
-  const best = extractPhoneFromVehicle(vehicleResponses);
-  if(best){ log(`🎯 Best candidate: +91 ${best.number} · source=${best.source} · path=${best.path} · score=${best.score}`, 'ok'); applyPhoneHandoff(best.number, best.source, best.path); return; }
-  const allSettled = ['mR','vR','vdR'].every(k => ST[k] !== null);
-  if(allSettled){
-    log(`❌ No phone number found`, 'err');
-    ST.phase2Started = true; ST.phase2Skipped = true; setHandoff('notfound');
-    Object.keys(ST.phoneStates).forEach(k => { ST.phoneStates[k] = 'done'; });
-    ST.phoneCompleteFired = true; ST.part3State = 'skipped'; ST.part3Started = true;
-    maybeFinalize();
-  } else { setHandoff('waiting'); }
 }
 
 /* ============================================================
@@ -808,10 +878,11 @@ function startPhase3(aadhar, source, field){
 }
 
 /* ============================================================
-   FINALIZE
+   FINALIZE  ★★★ FIXED for phone-only mode ★★★
    ============================================================ */
 function maybeFinalize(){
-  const vDone = [ST.mState, ST.vState, ST.vdState].every(s => s==='done'||s==='fail');
+  const isPhoneMode = ST.mode === 'phone';
+  const vDone = isPhoneMode || [ST.mState, ST.vState, ST.vdState].every(s => s==='done'||s==='fail');
   const pDone = Object.values(ST.phoneStates).every(s => s==='done'||s==='fail'||s==='nodata');
   const a3Done = ['done','fail','nodata','skipped'].includes(ST.part3State);
   if(!vDone || !pDone || !a3Done) return;
@@ -819,7 +890,7 @@ function maybeFinalize(){
   ST.allDone = true;
   renderSummary();
   if(!wasDone){
-    log('✅ Pipeline complete · 8 APIs', 'ok');
+    log('✅ Pipeline complete', 'ok');
     $('status').className = 'status';
     $('searchBtn').disabled = false;
     $('searchBtn').textContent = '🔍 Search';
@@ -911,6 +982,7 @@ async function doSearch(){
 
     if(phase2Timer){ clearTimeout(phase2Timer); phase2Timer = null; }
     if(phase3Timer){ clearTimeout(phase3Timer); phase3Timer = null; }
+    if(otpkingWaitTimer){ clearTimeout(otpkingWaitTimer); otpkingWaitTimer = null; }
 
     Object.assign(ST, {
       query: raw, mode: isPhoneOnly ? 'phone' : 'vehicle',
@@ -980,13 +1052,13 @@ async function doSearch(){
     $('results').innerHTML = `
       <div class="reg-hero"><div class="reg-plate">${esc(raw)}</div></div>
       <div class="section-divider">🚗 PART 1 · VEHICLE OSINT <small>3 vehicle APIs running in parallel</small></div>
-      <div class="sec-title">🔹 Source 1: otpking.xyz (Mobile &amp; Chassis)</div>
+      <div class="sec-title">🔹 Source 1: otpking.xyz (Mobile &amp; Chassis) — PRIMARY</div>
       <div id="vehicle-mR"><div class="loading-card"><div class="spinner"></div> Fetching otpking.xyz...</div></div>
       <div class="sec-title">🔹 Source 2: vehicleinfo-byrack.vercel.app</div>
       <div id="vehicle-vR"><div class="loading-card"><div class="spinner"></div> Fetching vehicleinfo-byrack...</div></div>
       <div class="sec-title">🔹 Source 3: api-wd7m.onrender.com (vehicle)</div>
       <div id="vehicle-vdR"><div class="loading-card"><div class="spinner"></div> Fetching api-wd7m...</div></div>
-      <div id="handoffCard" class="handoff-card"><div class="handoff-title">🔗 Phase 1 → Phase 2 · Mobile Handoff</div><div class="handoff-status">🔍 Scanning vehicle API responses for a mobile number...</div><div class="handoff-meta">otpking.xyz is the primary source</div></div>
+      <div id="handoffCard" class="handoff-card"><div class="handoff-title">🔗 Phase 1 → Phase 2 · Mobile Handoff</div><div class="handoff-status">🔍 Waiting for otpking.xyz (primary mobile source)...</div><div class="handoff-meta">Fallback sources: vehicleinfo-byrack & api-wd7m</div></div>
       <div id="phone-header"></div>
       <div id="phone-nR"></div><div id="phone-lR"></div><div id="phone-aR"></div><div id="phone-l2R"></div>
       <div id="part3Wrapper" style="display:none">
@@ -1028,7 +1100,7 @@ async function doSearch(){
 }
 
 /* ============================================================
-   ★★★ CLEAN TEXT-TABLE PDF REPORT ★★★
+   CLEAN TEXT-TABLE PDF REPORT
    ============================================================ */
 function collectVehicleOtpkingRows(rows){
   const api = ST.mR?.json;
@@ -1367,7 +1439,7 @@ async function downloadReport(){
 }
 
 /* ============================================================
-   ★★★ EVENT BINDINGS — DOMContentLoaded pe sab attach ★★★
+   EVENT BINDINGS
    ============================================================ */
 window.doSearch = doSearch;
 window.retryPhoneApi = retryPhoneApi;
@@ -1379,7 +1451,6 @@ window.clearDebug = clearDebug;
 document.addEventListener('DOMContentLoaded', function(){
   console.log('[OSINT] DOM ready — binding events');
 
-  /* Search button */
   const searchBtn = document.getElementById('searchBtn');
   if(searchBtn){
     searchBtn.addEventListener('click', function(e){
@@ -1389,7 +1460,6 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
 
-  /* Enter key */
   const inp = document.getElementById('inp');
   if(inp){
     inp.addEventListener('keydown', function(e){
@@ -1401,7 +1471,6 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
 
-  /* Example chips */
   document.querySelectorAll('[data-fill]').forEach(el => {
     el.addEventListener('click', function(){
       const v = this.getAttribute('data-fill');
@@ -1411,7 +1480,6 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   });
 
-  /* Debug toggle */
   const dbgToggle = document.getElementById('debugToggle');
   if(dbgToggle) dbgToggle.addEventListener('click', toggleDebug);
   const dbgClear = document.getElementById('dbgClear');
