@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Vehicle → Phone → Aadhaar OSINT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0f;--card:#12121a;--card2:#1a1a26;--border:#2a2a3d;--accent:#6c63ff;--green:#00d4aa;--red:#ff4757;--yellow:#ffa502;--text:#e8e8f0;--sub:#8888aa}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh}
+.hero{background:linear-gradient(135deg,#0a0a0f,#12102a,#0a0a0f);padding:36px 20px 28px;text-align:center;border-bottom:1px solid var(--border)}
+.logo{font-size:2.2rem;font-weight:800}.logo span{color:var(--accent)}
+.tagline{color:var(--sub);margin-top:6px;font-size:.9rem}
+.search-wrap{max-width:540px;margin:24px auto 0}
+.search-box{display:flex;gap:8px;background:var(--card2);border:1px solid var(--border);border-radius:14px;padding:8px 8px 8px 18px;align-items:center;transition:border-color .2s}
+.search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,99,255,.15)}
+.search-box input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:1.1rem;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+.search-box input::placeholder{color:var(--sub);font-weight:400;letter-spacing:0;text-transform:none;font-size:.95rem}
+.btn{background:linear-gradient(135deg,var(--accent),#8b5cf6);border:none;color:#fff;padding:10px 22px;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;transition:opacity .2s}
+.btn:hover{opacity:.85}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.small{padding:6px 12px;font-size:.8rem;border-radius:8px}
+.btn.big{padding:16px 40px;font-size:1.1rem;border-radius:12px;box-shadow:0 8px 28px rgba(0,212,170,.35)}
+.examples{margin-top:10px;color:var(--sub);font-size:.8rem}
+.examples span{display:inline-block;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:3px 10px;margin:3px;cursor:pointer;transition:border-color .2s}
+.examples span:hover{border-color:var(--accent);color:var(--accent)}
+.container{max-width:960px;margin:0 auto;padding:24px 14px 120px}
+.status{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:18px;display:none;align-items:center;gap:12px}
+.status.show{display:flex}
+.spinner{width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;animation:fadeUp .35s ease forwards;opacity:0;page-break-inside:avoid}
+@keyframes fadeUp{to{opacity:1;transform:translateY(0)}from{opacity:0;transform:translateY(14px)}}
+.card-head{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-weight:700;font-size:.92rem;flex-wrap:wrap}
+.card-body{padding:14px 16px}
+.row{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.row:last-child{border-bottom:none}
+.lbl{color:var(--sub);font-size:.8rem;flex:0 0 44%}
+.val{font-size:.85rem;font-weight:600;text-align:right;word-break:break-word;flex:0 0 54%}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:.78rem;font-weight:700}
+.green{background:rgba(0,212,170,.12);color:var(--green);border:1px solid rgba(0,212,170,.25)}
+.red{background:rgba(255,71,87,.12);color:var(--red);border:1px solid rgba(255,71,87,.25)}
+.yellow{background:rgba(255,165,2,.12);color:var(--yellow);border:1px solid rgba(255,165,2,.25)}
+.tag{display:inline-block;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:.82rem;font-weight:600}
+.full{grid-column:1/-1}
+.err-card{background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.2);border-radius:14px;padding:20px;text-align:center;color:var(--red);margin-bottom:14px}
+.loading-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;color:var(--sub);margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:10px}
+.reg-hero{text-align:center;margin-bottom:18px}
+.reg-plate{display:inline-block;background:var(--card2);border:2px solid var(--accent);border-radius:8px;padding:6px 20px;font-size:1.4rem;font-weight:800;letter-spacing:3px;color:var(--accent)}
+.hint{background:rgba(108,99,255,.06);border:1px solid rgba(108,99,255,.15);border-radius:12px;padding:20px;text-align:center;margin-top:24px}
+.hint p{color:var(--sub);font-size:.85rem;line-height:1.8}
+.sec-title{font-size:.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--sub);margin:20px 0 10px}
+.section-divider{margin:30px 0 6px;padding:16px 18px;border-radius:14px;background:linear-gradient(135deg,rgba(108,99,255,.14),rgba(0,212,170,.08));border:1px solid var(--border);text-align:center;font-weight:800;font-size:1.02rem;letter-spacing:1px;display:flex;flex-direction:column;align-items:center;gap:5px}
+.section-divider .pill{background:var(--green);color:#000;padding:3px 12px;border-radius:20px;font-size:.85rem;font-weight:800;letter-spacing:1px}
+.section-divider small{color:var(--sub);font-weight:500;letter-spacing:0;font-size:.75rem}
+.handoff-card{margin:26px 0;padding:22px 24px;border-radius:16px;background:linear-gradient(135deg,rgba(108,99,255,.14),rgba(0,212,170,.08));border:2px solid var(--accent);text-align:center}
+.handoff-card.found{border-color:var(--green);background:linear-gradient(135deg,rgba(0,212,170,.18),rgba(0,212,170,.06))}
+.handoff-card.notfound{border-color:var(--red);background:linear-gradient(135deg,rgba(255,71,87,.14),rgba(255,71,87,.04))}
+.handoff-title{font-size:.72rem;letter-spacing:2.5px;text-transform:uppercase;color:var(--sub);margin-bottom:10px;font-weight:700}
+.handoff-status{font-size:.98rem;font-weight:700;color:var(--text);margin-bottom:4px}
+.handoff-number{font-size:2rem;font-weight:900;letter-spacing:3px;color:var(--green);margin:8px 0;font-family:'Courier New',monospace}
+.handoff-meta{font-size:.78rem;color:var(--sub);margin-top:4px}
+.handoff-meta code{background:var(--card2);border:1px solid var(--border);padding:1px 6px;border-radius:4px;color:var(--accent);font-size:.75rem}
+.handoff-arrow{font-size:2rem;color:var(--accent);margin:10px 0 4px}
+.api-panel{border-radius:16px;border:1px solid var(--border);margin:22px 0;overflow:hidden;background:rgba(255,255,255,.015)}
+.api-panel-head{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;border-bottom:2px solid;font-weight:800;font-size:.95rem}
+.api-panel-body{padding:16px 16px 4px}
+.api-src{color:var(--sub);font-size:.72rem;font-weight:500}
+.api-1{border-color:rgba(108,99,255,.35)} .api-1 .api-panel-head{background:rgba(108,99,255,.08);border-bottom-color:var(--accent);color:var(--accent)}
+.api-2{border-color:rgba(255,71,87,.3)} .api-2 .api-panel-head{background:rgba(255,71,87,.08);border-bottom-color:var(--red);color:#ff8189}
+.api-3{border-color:rgba(0,212,170,.3)} .api-3 .api-panel-head{background:rgba(0,212,170,.08);border-bottom-color:var(--green);color:var(--green)}
+.api-4{border-color:rgba(56,189,248,.3)} .api-4 .api-panel-head{background:rgba(56,189,248,.08);border-bottom-color:#38bdf8;color:#38bdf8}
+.api-5{border-color:rgba(255,193,7,.35)} .api-5 .api-panel-head{background:rgba(255,193,7,.08);border-bottom-color:#ffc107;color:#ffc107}
+.footer{text-align:center;color:var(--sub);font-size:.75rem;padding:16px;border-top:1px solid var(--border);margin-top:20px}
+.download-block{margin-top:30px;padding:32px 22px;border-radius:18px;background:linear-gradient(135deg,rgba(0,212,170,.12),rgba(108,99,255,.1));border:2px solid var(--green);text-align:center}
+.download-block h3{font-size:1.15rem;font-weight:800;letter-spacing:1.5px;margin-bottom:10px;color:var(--green)}
+.download-block p{color:var(--sub);font-size:.85rem;line-height:1.75;margin-bottom:20px}
+.debug-toggle{position:fixed;left:20px;bottom:20px;z-index:999;background:var(--card2);border:1px solid var(--border);color:var(--text);width:44px;height:44px;border-radius:50%;cursor:pointer;font-size:1.1rem;display:none}
+.debug-toggle.show{display:block}
+.debug-toggle:hover{border-color:var(--accent)}
+.debug-panel{position:fixed;left:20px;bottom:74px;width:440px;max-width:calc(100vw - 40px);max-height:320px;background:#000;border:1px solid var(--border);border-radius:12px;display:none;z-index:998;overflow:hidden;font-family:'Courier New',monospace;font-size:.72rem}
+.debug-panel.show{display:block}
+.debug-head{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--card2);color:var(--accent);font-weight:700}
+.debug-head button{background:var(--card);border:1px solid var(--border);color:var(--text);padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;margin-left:6px}
+.debug-body{padding:8px 12px;color:#9ae6b4;overflow-y:auto;max-height:260px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.debug-body .log-line{display:block;padding:1px 0}
+.debug-body .log-line.err{color:#fc8181}
+.debug-body .log-line.warn{color:#f6ad55}
+.debug-body .log-line.ok{color:#68d391}
+.debug-body .log-line.info{color:#63b3ed}
+.debug-body .log-line.step{color:#d6bcfa;font-weight:700}
+#pdfBuilder{position:fixed;left:-99999px;top:0;width:820px;background:#fff;color:#000;padding:24px}
+.banner{background:rgba(255,165,2,.12);border:1px solid rgba(255,165,2,.35);border-radius:10px;padding:12px 18px;margin-bottom:14px;color:#ffc107;font-size:.83rem;line-height:1.6;display:none}
+.banner.show{display:block}
+@media(max-width:580px){
+  .logo{font-size:1.7rem}.grid{grid-template-columns:1fr}.search-box input{font-size:.95rem}.btn{padding:10px 14px}
+  .debug-toggle{left:12px;bottom:12px}
+  .debug-panel{left:12px;right:12px;width:auto;bottom:66px}
+  .handoff-number{font-size:1.5rem;letter-spacing:2px}
+  .btn.big{padding:14px 24px;font-size:.95rem}
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="logo">🚗 Vehicle <span>→</span> 📱 Phone <span>→</span> 🆔 Aadhaar</div>
+  <div class="tagline">1 Search Box · 8 APIs · Vehicle → Phone → Aadhaar/Ration Card · Clean PDF Report</div>
+  <div class="search-wrap">
+    <div class="search-box">
+      <input type="text" id="inp" placeholder="Enter Vehicle No. (e.g. UP53BC4364) or 10-digit Mobile" maxlength="11" autocomplete="off"/>
+      <button type="button" class="btn" id="searchBtn">🔍 Search</button>
+    </div>
+    <div class="examples">
+      Try: <span data-fill="UP53BC4364">UP53BC4364</span>
+           <span data-fill="CG24K5483">CG24K5483</span>
+           <span data-fill="MH12AB1234">MH12AB1234</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="banner" id="banner"></div>
+  <div class="status" id="status"><div class="spinner"></div><span id="statusTxt">Fetching...</span></div>
+  <div id="results"></div>
+  <div class="hint" id="hint">
+    <p>🔐 Enter any Indian vehicle registration number → the tool auto-resolves the owner's<br>
+    mobile number → then extracts the Aadhaar → and runs the full family/ration card lookup.<br>
+    Everything downloads as a single clean text-table PDF.</p>
+  </div>
+</div>
+
+<button type="button" class="debug-toggle" id="debugToggle" title="Pipeline log">🐛</button>
+<div class="debug-panel" id="debugPanel">
+  <div class="debug-head"><span>🐛 Pipeline Log</span><span><button type="button" id="dbgClear">Clear</button><button type="button" id="dbgClose">✕</button></span></div>
+  <div class="debug-body" id="debugBody"></div>
+</div>
+
+<div id="pdfBuilder"></div>
+
+<script>
+/* ============================================================
+   GLOBAL ERROR HANDLER
+   ============================================================ */
+window.addEventListener('error', function(e){
+  console.error('[GLOBAL ERROR]', e.error || e.message);
+  const banner = document.getElementById('banner');
+  if(banner){
+    banner.className = 'banner show';
+    banner.style.color = '#ff4757';
+    banner.style.background = 'rgba(255,71,87,.1)';
+    banner.style.borderColor = 'rgba(255,71,87,.3)';
+    banner.innerHTML = '⚠️ <b>Script Error:</b> ' + (e.message || e.error || 'Unknown error') + '<br>Open DevTools (F12) → Console for details.';
+  }
+});
+
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const MOBILE_API_BASE       = 'https://otpking.xyz/vehicle';
+const VEHICLE_INFO_API_BASE = 'https://vehicleinfo-byrack.vercel.app/api';
+const VDETAIL_API_BASE      = 'https://api-wd7m.onrender.com/api';
+const AADHAR_INFO_API       = 'https://family-infobyansh.vercel.app/aadhaar';
+const AADHAR_INFO_KEY       = 'FF';
+
+const PHONE_ENDPOINTS = {
+  nR : { rel:'/api/number', upstream:'https://anshapi.vercel.app/api/num?key=anshpapa&number=%N%' },
+  lR : { rel:'/api/leak',   upstream:'https://number-info-for-my-rasmalai-ayushi.vercel.app/NumberByAyush?key=QTS&Number=%N%' },
+  aR : { rel:'/api/aadhar', upstream:'https://number-info-what.vercel.app/open/search?mobile=%N%' },
+  l2R: { rel:'/api/leak2',  upstream:'https://api-wd7m.onrender.com/api?key=sharma&number=%2B91%N%&type=leak' }
+};
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const $ = id => document.getElementById(id);
+
+function esc(s){
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+function valid(v){
+  return v !== undefined && v !== null && String(v).trim() !== '' &&
+         !['null','undefined','N/A','NA','None','none','--'].includes(String(v).trim());
+}
+function get(obj, path, fallback=null){
+  try{ const v = path.split('.').reduce((a,k)=>a?.[k], obj); return valid(v) ? v : fallback; }
+  catch(e){ return fallback; }
+}
+function fmtDate(v){
+  if(!valid(v)) return null;
+  const s = String(v).split('T')[0].split(' ')[0];
+  let d;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) d = new Date(s+'T00:00:00');
+  else if(/^\d{2}\/\d{4}$/.test(s)){ const [m,y]=s.split('/'); return `${m}/${y}`; }
+  else if(/^(\d{1,2})-(\d{1,2})-(\d{4})$/.test(s)){
+    const [,dd,mm,yyyy] = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    d = new Date(`${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}T00:00:00`);
+  }
+  else if(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.test(s)){
+    const [,dd,mm,yyyy] = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    d = new Date(`${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}T00:00:00`);
+  }
+  else d = new Date(s);
+  if(isNaN(d)) return String(v);
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'});
+}
+function badgeStatus(text, type='green'){
+  const cls = type==='red'?'red':type==='yellow'?'yellow':'green';
+  return `<span class="badge ${cls}">${esc(text)}</span>`;
+}
+function row(label, value, html=false){
+  if(!valid(value)) return '';
+  return `<div class="row"><span class="lbl">${esc(label)}</span><span class="val">${html?value:esc(value)}</span></div>`;
+}
+function rowRaw(label, value){
+  const display = (value===null || value===undefined || String(value).trim()==='')
+    ? '<span class="tag">null</span>' : esc(String(value));
+  return `<div class="row"><span class="lbl">${esc(label)}</span><span class="val">${display}</span></div>`;
+}
+function safeStr(v){ return (v===undefined || v===null || String(v).trim()==='') ? 'N/A' : String(v); }
+function card(title, body, delay='.05s'){
+  return `<div class="card" style="animation-delay:${delay}"><div class="card-head">${title}</div><div class="card-body">${body}</div></div>`;
+}
+function humanizeKey(k){ return String(k).replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/_/g,' ').trim(); }
+function prettifyKey(k){ return String(k).replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()); }
+function renderAllKeys(obj, known){
+  known = known || {};
+  let body = '';
+  Object.keys(obj).forEach(k => { body += rowRaw(known[k] || humanizeKey(k), obj[k]); });
+  return body;
+}
+function maskAadhar(a){
+  if(!a) return '';
+  const s = String(a).replace(/\D/g,'');
+  if(s.length !== 12) return s;
+  return s.slice(0,4) + '********' + s.slice(-4);
+}
+
+/* ============================================================
+   DEBUG LOG
+   ============================================================ */
+function log(msg, kind='info'){
+  const body = $('debugBody');
+  if(body){
+    const line = document.createElement('span');
+    line.className = 'log-line ' + kind;
+    const ts = new Date().toLocaleTimeString('en-IN',{hour12:false});
+    line.textContent = `[${ts}] ${msg}`;
+    body.appendChild(line);
+    body.scrollTop = body.scrollHeight;
+  }
+  const fn = kind==='err' ? 'error' : kind==='warn' ? 'warn' : 'log';
+  console[fn]('[OSINT]', msg);
+}
+function clearDebug(){ const b=$('debugBody'); if(b) b.innerHTML=''; }
+function toggleDebug(){ const p = $('debugPanel'); if(p) p.classList.toggle('show'); }
+
+/* ============================================================
+   CORS RESILIENT FETCH
+   ============================================================ */
+const CORS_PROXIES = [
+  u => u,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  u => `https://api.cors.lol/url=${u}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://r.jina.ai/${u}`
+];
+function looksLikeProxyRejection(json){
+  if(!json || typeof json!=='object' || Array.isArray(json)) return false;
+  const keys = Object.keys(json);
+  if(keys.length===1 && keys[0]==='error') return true;
+  if(keys.length<=2 && typeof json.error==='string' && /api key|unauthorized|rate limit|quota/i.test(json.error)) return true;
+  return false;
+}
+async function attemptFetch(buildUrl, targetUrl, timeoutMs){
+  const url = buildUrl(targetUrl);
+  const label = url===targetUrl ? 'direct' : (new URL(url).hostname);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try{
+    const r = await fetch(url, {method:'GET', headers:{accept:'application/json'}, signal:controller.signal});
+    clearTimeout(timer);
+    const raw = await r.text();
+    let json = null;
+    try{ json = JSON.parse(raw); }
+    catch(e){ const m = raw.match(/\{[\s\S]*\}/); if(m){ try{ json = JSON.parse(m[0]); }catch(e2){} } }
+    if(!json) throw new Error(`${label}: HTTP ${r.status}, invalid JSON`);
+    if(looksLikeProxyRejection(json)) throw new Error(`${label}: proxy rejected (${json.error})`);
+    const inner = get(json,'data.content');
+    if(typeof inner === 'string' && json.code !== undefined && json.status !== undefined){
+      try{ json = JSON.parse(inner); }
+      catch(e3){ const m = inner.match(/\{[\s\S]*\}/); if(m){ try{ json = JSON.parse(m[0]); }catch(e4){} } }
+    }
+    return {json, raw, httpStatus:r.status, parseError:null};
+  }catch(e){
+    clearTimeout(timer);
+    const reason = e.name==='AbortError' ? `Timed out after ${timeoutMs/1000}s` : (e.message||String(e));
+    throw new Error(reason.startsWith(label) ? reason : `${label}: ${reason}`);
+  }
+}
+async function resilientFetch(targetUrl){
+  const schedule = [10000, 16000, 22000];
+  let lastErrors = [];
+  for(let i=0; i<schedule.length; i++){
+    try{ return await Promise.any(CORS_PROXIES.map(b => attemptFetch(b, targetUrl, schedule[i]))); }
+    catch(agg){
+      lastErrors = (agg.errors||[]).map(e => e.message||String(e));
+      if(i < schedule.length-1) await new Promise(r => setTimeout(r, 500));
+    }
+  }
+  return {json:null, raw:'', httpStatus:0, parseError:lastErrors.join(' | '), allFailed:true};
+}
+
+async function mobileFetch(reg){ log(`→ Fetching otpking.xyz for ${reg}...`, 'step'); const r = await resilientFetch(`${MOBILE_API_BASE}/${encodeURIComponent(reg)}`); log(r.json?'✅ otpking.xyz OK':`❌ otpking.xyz failed: ${r.parseError}`, r.json?'ok':'err'); return r; }
+async function vehicleInfoFetch(reg){ log(`→ Fetching vehicleinfo-byrack for ${reg}...`, 'step'); const r = await resilientFetch(`${VEHICLE_INFO_API_BASE}?search=${encodeURIComponent(reg)}`); log(r.json?'✅ vehicleinfo-byrack OK':`❌ vehicleinfo-byrack failed: ${r.parseError}`, r.json?'ok':'err'); return r; }
+async function vdetailFetch(reg){ log(`→ Fetching api-wd7m for ${reg}...`, 'step'); const r = await resilientFetch(`${VDETAIL_API_BASE}?key=sharma&number=${encodeURIComponent(reg)}&type=vehicle`); log(r.json?'✅ api-wd7m OK':`❌ api-wd7m failed: ${r.parseError}`, r.json?'ok':'err'); return r; }
+
+async function phoneFetch(endpointKey, number){
+  const cfg = PHONE_ENDPOINTS[endpointKey];
+  if(!cfg) return {json:null, parseError:`Unknown ${endpointKey}`};
+  log(`→ Phone ${endpointKey}: /api/ for +91 ${number}`, 'step');
+  try{
+    const r = await fetch(`${cfg.rel}?number=${encodeURIComponent(number)}`, {headers:{accept:'application/json'}});
+    const text = await r.text();
+    const t = text.trim();
+    if(t.startsWith('{') || t.startsWith('[')){
+      try{ const json = JSON.parse(text); log(`✅ Phone ${endpointKey}: serverless OK`, 'ok'); return {json, raw:text, httpStatus:r.status, parseError:null, _via:'serverless'}; }catch(e){}
+    }
+    log(`⚠️ Phone ${endpointKey}: non-JSON (HTTP ${r.status}) → proxy fallback`, 'warn');
+  }catch(e){ log(`⚠️ Phone ${endpointKey}: unreachable → proxy fallback`, 'warn'); }
+  const upstreamUrl = cfg.upstream.replace('%N%', encodeURIComponent(number));
+  const result = await resilientFetch(upstreamUrl);
+  if(result.json){ result._via = 'proxy-fallback'; log(`✅ Phone ${endpointKey}: proxy fallback OK`, 'ok'); return result; }
+  log(`❌ Phone ${endpointKey}: both failed`, 'err');
+  return {json:null, raw:'', httpStatus:0, parseError:`Serverless & proxy both failed`, _via:'failed'};
+}
+async function aadharInfoFetch(aadhar){ log(`→ Fetching Aadhaar family info for ${maskAadhar(aadhar)}...`, 'step'); const r = await resilientFetch(`${AADHAR_INFO_API}?aadhaar=${encodeURIComponent(aadhar)}&key=${AADHAR_INFO_KEY}`); log(r.json?'✅ Aadhaar API OK':`❌ Aadhaar API failed: ${r.parseError}`, r.json?'ok':'err'); return r; }
+
+/* ============================================================
+   EXTRACTION
+   ============================================================ */
+function looksLikeIndianMobile(str){
+  if(str === null || str === undefined) return null;
+  const digits = String(str).replace(/\D/g,'');
+  if(digits.length < 10 || digits.length > 13) return null;
+  const last10 = digits.slice(-10);
+  if(/^[6-9]\d{9}$/.test(last10)) return last10;
+  return null;
+}
+function looksLikeAadhar(str){
+  if(str === null || str === undefined) return null;
+  const digits = String(str).replace(/\D/g,'');
+  if(digits.length !== 12) return null;
+  if(!/^[2-9]\d{11}$/.test(digits)) return null;
+  return digits;
+}
+function phoneFieldScore(key){
+  const k = String(key).toLowerCase();
+  if(k === 'mobile' || k === 'mobileno' || k === 'mobile_no' || k === 'mobile_number' || k === 'mobilenumber' || k === 'mob_no' || k === 'mobno') return 100;
+  if(k === 'phone' || k === 'phoneno' || k === 'phone_no' || k === 'phone_number' || k === 'phonenumber') return 95;
+  if(k === 'contact' || k === 'contactno' || k === 'contact_no' || k === 'contact_number' || k === 'contactnumber') return 90;
+  if(k === 'whatsapp' || k === 'whatsapp_number' || k === 'whatsappno') return 85;
+  if(k === 'cell' || k === 'cellno' || k === 'telephone' || k === 'tel') return 80;
+  if(/alt|alternate|secondary|other|backup/.test(k) && /mobile|phone|contact|number|cell/.test(k)) return 30;
+  if(/alt|alternate|secondary|other|backup/.test(k)) return 25;
+  if(/mobile|phone|contact|whatsapp|cell|telephone/.test(k)) return 60;
+  if(/number|num/.test(k)) return 50;
+  return 0;
+}
+const BAD_KEY_PATTERNS = [/chassis/i,/engine/i,/regno/i,/registration/i,/pincode/i,/^pin$/i,/aadhar/i,/aadhaar/i,/uid/i,/record_?id/i,/^id$/i,/rto/i,/vehicleid/i,/variantid/i,/manufacturerid/i,/fuelid/i,/cubic/i,/challan/i,/receipt/i,/fps_?id/i,/rc_?id/i,/member_?id/i,/scheme_?id/i];
+function isBadFieldName(path){ const last = String(path).split('.').pop() || ''; return BAD_KEY_PATTERNS.some(re => re.test(last)); }
+function collectPhoneCandidates(obj, path='', depth=0, out=[]){
+  if(depth > 8 || obj === null || obj === undefined) return out;
+  if(typeof obj === 'string' || typeof obj === 'number'){
+    if(isBadFieldName(path)) return out;
+    const mobile = looksLikeIndianMobile(obj);
+    if(mobile){
+      const lastKey = String(path).split('.').pop() || path;
+      const score = phoneFieldScore(lastKey);
+      if(score > 0) out.push({ number: mobile, path: path || '(root)', score });
+    }
+    return out;
+  }
+  if(typeof obj !== 'object') return out;
+  for(const k of Object.keys(obj)){
+    const childPath = path ? `${path}.${k}` : k;
+    collectPhoneCandidates(obj[k], childPath, depth+1, out);
+  }
+  return out;
+}
+function extractPhoneFromVehicle(vehicleResponses){
+  const allCandidates = [];
+  for(const { name, json, sourcePriority } of vehicleResponses){
+    if(!json) continue;
+    const hits = collectPhoneCandidates(json);
+    for(const h of hits) allCandidates.push({ ...h, source: name, sourcePriority });
+  }
+  if(!allCandidates.length) return null;
+  allCandidates.sort((a,b) => {
+    if(b.sourcePriority !== a.sourcePriority) return b.sourcePriority - a.sourcePriority;
+    if(b.score !== a.score) return b.score - a.score;
+    const da = a.path.split('.').length, db = b.path.split('.').length;
+    if(da !== db) return da - db;
+    return a.path.localeCompare(b.path);
+  });
+  return allCandidates[0];
+}
+function aadharPathScore(path){
+  const lp = (path||'').toLowerCase();
+  if(/aadhar|aadhaar|uid/.test(lp)) return 100;
+  if(/record.?id/.test(lp)) return 50;
+  if(/(^|\.)id$/.test(lp)) return 30;
+  return 5;
+}
+function deepFindAadhar(obj, path='', depth=0){
+  if(depth > 8 || obj === null || obj === undefined) return null;
+  if(typeof obj === 'string' || typeof obj === 'number'){
+    const a = looksLikeAadhar(obj);
+    if(!a) return null;
+    const score = aadharPathScore(path);
+    if(score < 30) return null;
+    return { aadhar: a, path: path || '(root)', score };
+  }
+  if(typeof obj !== 'object') return null;
+  let best = null;
+  const keys = Object.keys(obj);
+  const sorted = [...keys].sort((a,b) => {
+    const la = a.toLowerCase(), lb = b.toLowerCase();
+    const sa = /aadhar|aadhaar|uid/.test(la) ? -5 : (/record.?id/.test(la) ? -3 : (la==='id' ? -2 : 0));
+    const sb = /aadhar|aadhaar|uid/.test(lb) ? -5 : (/record.?id/.test(lb) ? -3 : (lb==='id' ? -2 : 0));
+    return sa - sb;
+  });
+  for(const k of sorted){
+    const cp = path ? `${path}.${k}` : k;
+    const found = deepFindAadhar(obj[k], cp, depth+1);
+    if(found && (!best || found.score > best.score)) best = found;
+    if(best && best.score >= 100) break;
+  }
+  return best;
+}
+
+/* ============================================================
+   VEHICLE CARDS
+   ============================================================ */
+function buildVdetailCards(resp, rtoData, delayStart){
+  resp = resp||{}; rtoData = rtoData||{};
+  let d = delayStart;
+  const next = () => { d += 0.01; return d.toFixed(2)+'s'; };
+  let h = '';
+  h += card('🏛️ RTO & Registration',
+    row('RTO Name', get(rtoData,'rtoName'))+row('RTO Code', get(rtoData,'rtoCode')||get(resp,'rtoCode'))+
+    row('State', get(rtoData,'statename'))+row('RTO Active', rtoData.isActive!==undefined ? String(rtoData.isActive) : null)+
+    row('Registration Authority', get(resp,'regAuthority'))+row('Registration No', get(resp,'regNo'))+
+    row('Registration Date', fmtDate(get(resp,'regDate'))||get(resp,'regDate'))+row('Record ID', get(resp,'id'))+
+    row('RTO ID', get(resp,'rtoId'))+row('Combined ID', get(rtoData,'combindID'))+row('Order By', get(rtoData,'orderBy')), next());
+  h += card('🔧 Vehicle & Variant',
+    row('Manufacturer', get(resp,'manufacturer'))+row('Manufacturer ID', get(resp,'manufacturerId'))+
+    row('Manufacturer Month/Year', get(resp,'manufacturerMonthYear'))+row('Manufacturer Year', get(resp,'manufacturerYear'))+
+    row('Vehicle', get(resp,'vehicle'))+row('Vehicle ID', get(resp,'vehicleId'))+
+    row('Vehicle Type', get(resp,'vehicleType'))+row('Vehicle Class', get(resp,'vehicleClass'))+
+    row('Vehicle Age', get(resp,'vehicleAge'))+row('Variant', get(resp,'variant'))+
+    row('Variant ID', get(resp,'variantID'))+row('Fuel Type', get(resp,'fuelType'))+
+    row('Fuel ID', get(resp,'fuelId'))+row('Cubic Capacity', get(resp,'cubicCapacity'))+
+    row('Seat Capacity', get(resp,'seatCapacity'))+row('Is Commercial', resp.isCommercial!==undefined ? String(resp.isCommercial) : null)+
+    row('Chassis', get(resp,'chassis'))+row('Engine', get(resp,'engine')), next());
+  h += card('👤 Owner & Address',
+    row('Owner', get(resp,'owner'))+row("Owner's Father Name", get(resp,'ownerFatherName'))+
+    row('Financer', get(resp,'financerName'))+row('Present Address', get(resp,'presentAddress'))+
+    row('Permanent Address', get(resp,'permAddress'))+row('Pincode', get(resp,'pincode')), next());
+  h += card('🛡️ Insurance, PUCC & Status',
+    row('Insurance Company', get(resp,'insuranceCompanyName'))+row('Insurance Company Code', get(resp,'insuranceCompanyCode'))+
+    row('Insurance Policy Number', get(resp,'insurancePolicyNumber'))+row('Insurance Valid Upto', fmtDate(get(resp,'insuranceUpto'))||get(resp,'insuranceUpto'))+
+    row('Insurance Expired', resp.insuranceExpired!==undefined ? String(resp.insuranceExpired) : null)+
+    row('PUCC Number', get(resp,'puccNumber'))+row('PUCC Valid Upto', fmtDate(get(resp,'puccValidUpto'))||get(resp,'puccValidUpto'))+
+    row('Status Code', get(resp,'status'))+row('Status Description', get(resp,'statusDesc'))+
+    row('Data Status', get(resp,'dataStatus'))+row('Entry Date', get(resp,'eDate'))+
+    row('Last Modified Date', get(resp,'lmDate')), next());
+  return h;
+}
+function renderVehicleOtpking(resp){
+  const api = resp?.json;
+  if(!api) return `<div class="grid">${card('📞 otpking.xyz — Fetch Failed', row('Error', resp?.parseError||'No response')+row('Hint','Hit Search again — cold start often recovers on retry.'), '.10s')}</div>`;
+  return `<div class="grid">${card('📞 Mobile & Chassis Verification (otpking.xyz)',
+    row('Mobile Number', get(api,'mobile') ? `+91 ${get(api,'mobile')}` : 'Not Returned by API')+
+    row('Vehicle (Echoed)', get(api,'vehicle'))+row('Chassis (Full)', get(api,'chassis_full'))+
+    row('Chassis (Last 5)', get(api,'chassis_last5'))+row('Chassis Source', get(api,'chassis_source'))+
+    row('API Success Flag', api.success!==undefined ? String(api.success) : null), '.10s')}</div>`;
+}
+function renderVehicleVdetail(resp, label, delay){
+  const api = resp?.json;
+  if(!api) return `<div class="grid">${card(`⚠️ ${label} — Fetch Failed`, row('Error', resp?.parseError||'No response')+row('Hint','Cold start often recovers on retry.'), delay)}</div>`;
+  const data = get(api,'data',{}) || {};
+  const rtoD = get(data,'response.rtoData',{}) || {};
+  const respD = get(data,'response',{}) || {};
+  return `<div class="grid">${buildVdetailCards(respD, rtoD, parseFloat(delay))}</div>`;
+}
+
+/* ============================================================
+   PHONE CARDS
+   ============================================================ */
+function renderMobileSection(mobileResp, number){
+  const api = mobileResp?.json;
+  const open = `<div class="api-panel api-1"><div class="api-panel-head"><span>📱 API 1 · Mobile Information</span><span class="api-src">anshapi.vercel.app</span></div><div class="api-panel-body">`;
+  const close = `</div></div>`;
+  if(!api) return open+`<div class="err-card">❌ Mobile Info API Error<br><small>${esc(mobileResp?.parseError||'No response')}</small><br><br><button type="button" class="btn small" onclick="retryPhoneApi('nR')">🔁 Retry</button></div>`+close;
+  const data = api?.data||{};
+  const inner = data?.Data||{};
+  const records = Array.isArray(inner.Main_Records) ? inner.Main_Records : [];
+  const altRecords = Array.isArray(inner.Alt_Records) ? inner.Alt_Records : [];
+  const knownMain = {mobile:'Mobile', name:'Name', fname:"Father's Name", address:'Address', alt:'Alternate Mobile', circle:'Circle', id:'Record ID', email:'Email'};
+  let h = `<div class="grid">`;
+  h += card('📊 Overview',
+    row('Mobile Number', number)+
+    row('Status', api.status===true ? badgeStatus('✅ SUCCESS','green') : badgeStatus('⚠️ '+(data.status||'Response Returned'),'yellow'), true)+
+    row('Main Records', String(records.length))+row('Alternate Records', String(altRecords.length)), '.05s');
+  if(records.length){ records.forEach((r,i) => { h += card(`👤 Record ${i+1}`, renderAllKeys(r, knownMain), (0.08+i*0.03).toFixed(2)+'s'); }); }
+  else { h += card('📋 Result', row('Message', mobileResp?.httpStatus===404 ? 'No data found' : 'No Main_Records returned'), '.08s'); }
+  if(altRecords.length){ altRecords.forEach((r,i) => { h += card(`👤 Alt Record ${i+1}`, renderAllKeys(r, knownMain), (0.1+records.length*0.03+i*0.03).toFixed(2)+'s'); }); }
+  h += `</div>`;
+  h += `<div class="sec-title">📡 API Response Status</div><div class="card full"><div class="card-body">`+
+    row('HTTP Status', mobileResp?.httpStatus ?? 'N/A')+row('Response Status', safeStr(api.status))+
+    row('Data Status', data.status||'N/A')+row('Developer', data.Developer||'')+row('Credit', api.credit||'N/A')+
+    row('Fetch Path', mobileResp?._via === 'proxy-fallback' ? 'Direct upstream (CORS proxy)' : 'Serverless /api/number')+
+  `</div></div>`;
+  return open+h+close;
+}
+function renderLeakSection(leakResp){
+  const api = leakResp?.json;
+  const open = `<div class="api-panel api-2"><div class="api-panel-head"><span>🕵️ API 2 · Breach &amp; Leak Intelligence</span><span class="api-src">number-info-for-my-rasmalai-ayushi.vercel.app</span></div><div class="api-panel-body">`;
+  const close = `</div></div>`;
+  if(!api) return open+`<div class="err-card">❌ Leak Intelligence API Error<br><small>${esc(leakResp?.parseError||'No response')}</small><br><br><button type="button" class="btn small" onclick="retryPhoneApi('lR')">🔁 Retry</button></div>`+close;
+  const d = api?.data||{};
+  const results = Array.isArray(d.result) ? d.result : [];
+  let h = `<div class="grid">`+card('📊 Lookup Summary',
+    row('Query Number', api.number)+
+    row('Status', api.status===true ? badgeStatus('✅ SUCCESS','green') : badgeStatus('⚠️ Response Returned','yellow'), true)+
+    row('Data Success', safeStr(d.success))+row('Records Found', String(results.length))+
+    row('Timestamp', api.timestamp)+row('HTTP Status', leakResp?.httpStatus ?? 'N/A')+
+    row('Fetch Path', leakResp?._via === 'proxy-fallback' ? 'Direct upstream (CORS proxy)' : 'Serverless /api/leak'), '.05s')+`</div>`;
+  if(!results.length) return open+h+`<div class="grid">`+card('📋 Result', row('Message', leakResp?.httpStatus===404 ? 'No data found' : 'No records returned'), '.08s')+`</div>`+close;
+  const knownLeak = {name:'Name', fname:"Father's Name", num:'Mobile Number', alt:'Alternate Number', aadhar:'Aadhar Number', circle:'Circle', email:'Email', address:'Address'};
+  h += `<div class="grid">`;
+  results.forEach((r,i) => { h += card(`🕵️ Record ${i+1}`, renderAllKeys(r, knownLeak), (0.08+i*0.03).toFixed(2)+'s'); });
+  h += `</div>`;
+  return open+h+close;
+}
+function renderAadharSection(aadharResp){
+  const api = aadharResp?.json;
+  const open = `<div class="api-panel api-3"><div class="api-panel-head"><span>🪪 API 3 · Identity / Aadhaar Intelligence</span><span class="api-src">number-info-what.vercel.app</span></div><div class="api-panel-body">`;
+  const close = `</div></div>`;
+  if(!api) return open+`<div class="err-card">❌ Identity API Error<br><small>${esc(aadharResp?.parseError||'No response')}</small><br><br><button type="button" class="btn small" onclick="retryPhoneApi('aR')">🔁 Retry</button></div>`+close;
+  const d = api?.data||{};
+  const results = Array.isArray(d.results) ? d.results : [];
+  let h = `<div class="grid">`+card('📊 Lookup Summary',
+    row('Query', d.query)+row('Status', api.success===true ? badgeStatus('✅ SUCCESS','green') : badgeStatus('⚠️ Response Returned','yellow'), true)+
+    row('Data Success', safeStr(d.success))+row('Mode', api.mode)+
+    row('Searched Fields', Array.isArray(d.searched_fields) ? d.searched_fields.join(', ') : d.searched_fields)+
+    row('Number', d.number)+row('Count', d.count)+row('Total', d.total)+
+    row('Fetch Path', aadharResp?._via === 'proxy-fallback' ? 'Direct upstream (CORS proxy)' : 'Serverless /api/aadhar'), '.05s')+`</div>`;
+  if(!results.length) return open+h+`<div class="grid">`+card('📋 Result', row('Message', aadharResp?.httpStatus===404 ? 'No data found' : 'No results returned'), '.08s')+`</div>`+close;
+  const knownAadhar = {name:'Name', fathersName:"Father's Name", phoneNumber:'Phone Number', aadharNumber:'Aadhar Number', otherNumber:'Other Number', address:'Address', district:'District', pincode:'Pincode', state:'State', town:'Town', source:'Source'};
+  h += `<div class="grid">`;
+  results.forEach((r,i) => {
+    let body = '';
+    Object.keys(r).forEach(k => { if(k==='connected_numbers') return; body += rowRaw(knownAadhar[k] || humanizeKey(k), r[k]); });
+    const connected = Array.isArray(r.connected_numbers) ? r.connected_numbers : [];
+    if(connected.length){
+      body += `<div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px"><div style="color:var(--accent);font-size:.75rem;font-weight:700;margin-bottom:4px">Connected Numbers</div>`;
+      connected.forEach(c => { Object.keys(c).forEach(ck => { body += rowRaw(humanizeKey(ck), c[ck]); }); });
+      body += `</div>`;
+    }
+    h += card(`🪪 Result ${i+1}`, body, (0.08+i*0.03).toFixed(2)+'s');
+  });
+  h += `</div>`;
+  return open+h+close;
+}
+function renderLeak2Section(leak2Resp){
+  const api = leak2Resp?.json;
+  const open = `<div class="api-panel api-4"><div class="api-panel-head"><span>🔎 API 4 · Leak Intelligence</span><span class="api-src">api-wd7m.onrender.com</span></div><div class="api-panel-body">`;
+  const close = `</div></div>`;
+  if(!api) return open+`<div class="err-card">❌ Leak API Error<br><small>${esc(leak2Resp?.parseError||'No response')}</small><br><br><button type="button" class="btn small" onclick="retryPhoneApi('l2R')">🔁 Retry</button></div>`+close;
+  const d = api?.data||{};
+  const sources = d?.data||{};
+  const sourceKeys = Object.keys(sources);
+  let h = `<div class="grid">`+card('📊 Lookup Summary',
+    row('API Used', api.api_used)+row('Status', (api.success===true || api.status===true) ? badgeStatus('✅ SUCCESS','green') : badgeStatus('⚠️ Response Returned','yellow'), true)+
+    row('Query', d.query)+row('Type', api.type)+row('Sources Found', String(sourceKeys.length))+
+    row('Response Time (ms)', d.response_time_ms)+row('Usage Tracked', safeStr(d.usage_tracked))+
+    row('Key', api.key)+row('Limit', api.limit)+row('Remaining', api.remaining)+
+    row('Data Status', safeStr(d.status))+row('HTTP Status', leak2Resp?.httpStatus ?? 'N/A')+
+    row('Fetch Path', leak2Resp?._via === 'proxy-fallback' ? 'Direct upstream (CORS proxy)' : 'Serverless /api/leak2'), '.05s')+`</div>`;
+  if(!sourceKeys.length) return open+h+`<div class="grid">`+card('📋 Result', row('Message', leak2Resp?.httpStatus===404 ? 'No data found' : 'No sources returned'), '.08s')+`</div>`+close;
+  h += `<div class="grid">`;
+  sourceKeys.forEach((srcKey,i) => {
+    const src = sources[srcKey]||{};
+    const records = Array.isArray(src.records) ? src.records : [];
+    let body = '';
+    Object.keys(src).forEach(k => {
+      if(k==='records') return;
+      const val = src[k];
+      if(val===undefined || val===null || String(val).trim()==='') return;
+      body += `<div style="color:var(--sub);font-size:.78rem;line-height:1.6;margin-bottom:6px"><b style="color:var(--accent)">${esc(humanizeKey(k))}:</b> ${esc(String(val))}</div>`;
+    });
+    if(records.length){
+      records.forEach((rec,ri) => {
+        body += `<div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px"><div style="color:var(--accent);font-size:.75rem;font-weight:700;margin-bottom:4px">Record ${ri+1}</div>`;
+        Object.keys(rec).forEach(k => { body += rowRaw(humanizeKey(k), rec[k]); });
+        body += `</div>`;
+      });
+    } else { body += `<div style="color:var(--sub);font-size:.8rem">No records in this source</div>`; }
+    h += card(`${esc(src.title||srcKey)} <span style="color:var(--sub);font-weight:400;font-size:.75rem">(${records.length} record${records.length===1?'':'s'})</span>`, body, (0.08+i*0.02).toFixed(2)+'s');
+  });
+  h += `</div>`;
+  return open+h+close;
+}
+function renderPart3Section(aadharResp, aadhar){
+  const api = aadharResp?.json;
+  const open = `<div class="api-panel api-5"><div class="api-panel-head"><span>🆔 API 5 · Aadhaar / Ration Card Intelligence</span><span class="api-src">family-infobyansh.vercel.app</span></div><div class="api-panel-body">`;
+  const close = `</div></div>`;
+  if(!api) return open+`<div class="err-card">❌ Aadhaar Family Info API Error<br><small>${esc(aadharResp?.parseError||'No response')}</small><br><br><button type="button" class="btn small" onclick="retryAadharApi()">🔁 Retry</button></div>`+close;
+  const data = api?.data || {};
+  const pd = data?.pd || {};
+  const credit = api?.credit || {};
+  const members = Array.isArray(pd?.memberDetailsList) ? pd.memberDetailsList : [];
+  let h = `<div class="grid">`;
+  h += card('📊 Overview',
+    row('Aadhaar (Masked)', api.aadhaar || maskAadhar(aadhar))+row('Ration Card No.', api.ration_card)+
+    row('Status', api.status === 'success' ? badgeStatus('✅ SUCCESS','green') : badgeStatus('⚠️ '+(api.status||'Response Returned'),'yellow'), true)+
+    row('Source', api.source)+row('Response Time', api.response_time)+row('Timestamp', api.timestamp)+
+    row('Fetch Path', aadharResp?._via === 'proxy-fallback' ? 'Direct upstream (CORS proxy)' : 'Direct'), '.10s');
+  if(credit.made_by || credit.username) h += card('👨‍💻 Credit', row('Made By', credit.made_by)+row('Username', credit.username), '.15s');
+  h += card('🏠 Ration Card / Personal Details',
+    row('Home State', pd.homeStateName)+row('Home State Code', pd.homeStateCode)+row('Home District', pd.homeDistName)+row('District Code', pd.districtCode)+
+    row('Address', pd.address)+row('FPS ID', pd.fpsId)+row('RC ID', pd.rcId)+row('Ration Card (rc)', data.rc)+
+    row('Scheme ID', pd.schemeId)+row('Scheme Name', pd.schemeName)+row('Allowed On ORC', pd.allowed_onorc)+row('Dup UID Status', pd.dup_uid_status)+
+    row('Record Status (rd)', data.rd)+row('Record Status (rs)', data.rs), '.20s');
+  if(members.length){
+    members.forEach((m, i) => {
+      h += card(`👥 Member ${i+1} · ${esc(m.memberName || 'Unknown')}`,
+        row('Member ID', m.memberId)+row('Name', m.memberName)+row('Relationship', m.releationship_name)+
+        row('Relationship Code', m.relationship_code)+row('UID Linked', m.uid), (0.25 + i*0.03).toFixed(2)+'s');
+    });
+  } else { h += card('👥 Family Members', row('Message','No member details returned'), '.25s'); }
+  h += `</div>`;
+  return open + h + close;
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const ST = {
+  query:'', mode:'vehicle',
+  mR:null, vR:null, vdR:null,
+  mState:'pending', vState:'pending', vdState:'pending',
+  phone:null, phoneSource:null, phoneField:null,
+  phase2Started:false, phase2Skipped:false,
+  nR:null, lR:null, aR:null, l2R:null,
+  phoneStates:{ nR:'pending', lR:'pending', aR:'pending', l2R:'pending' },
+  phoneCompleteFired:false,
+  aadhar:null, aadharSource:null, aadharField:null,
+  part3Started:false, part3Skipped:false, part3State:'pending',
+  aadharResp:null,
+  allDone:false
+};
+let phase2Timer = null;
+let phase3Timer = null;
+let otpkingWaitTimer = null;
+
+/* ============================================================
+   HANDOFF UI
+   ============================================================ */
+function setHandoff(state, data){
+  const el = $('handoffCard'); if(!el) return;
+  el.classList.remove('found','notfound');
+  if(state === 'waiting'){
+    el.innerHTML = `<div class="handoff-title">🔗 Phase 1 → Phase 2 · Mobile Handoff</div><div class="handoff-status">🔍 Waiting for otpking.xyz (primary mobile source)...</div><div class="handoff-meta">Fallback sources: vehicleinfo-byrack & api-wd7m</div>`;
+  } else if(state === 'found'){
+    el.classList.add('found');
+    el.innerHTML = `<div class="handoff-title">✅ Mobile Number Extracted · Forwarding to Phase 2</div><div class="handoff-number">+91 ${esc(data.number)}</div><div class="handoff-meta">Source: <code>${esc(data.source)}</code> · Field: <code>${esc(data.field)}</code></div><div class="handoff-arrow" style="color:var(--green)">⬇️</div><div class="handoff-status" style="color:var(--green)">🚀 Auto-triggering 4 phone APIs with this number...</div>`;
+  } else if(state === 'notfound'){
+    el.classList.add('notfound');
+    el.innerHTML = `<div class="handoff-title">⚠️ No Mobile Number Found</div><div class="handoff-status" style="color:var(--red)">None of the 3 vehicle APIs returned a valid Indian mobile number</div><div class="handoff-meta">Phase 2 skipped</div>`;
+  }
+}
+function setPart3Handoff(state, data){
+  const el = $('part3Handoff'); if(!el) return;
+  el.classList.remove('found','notfound');
+  if(state === 'waiting'){
+    el.innerHTML = `<div class="handoff-title">🔗 Phase 2 → Phase 3 · Aadhaar Handoff</div><div class="handoff-status">🔍 Scanning phone API responses for an Aadhaar number...</div><div class="handoff-meta">Looking in Mobile Info, Breach Intel, Aadhaar Intel & Leak Intel</div>`;
+  } else if(state === 'found'){
+    el.classList.add('found');
+    el.innerHTML = `<div class="handoff-title">✅ Aadhaar Extracted · Forwarding to Phase 3</div><div class="handoff-number">${esc(maskAadhar(data.aadhar))}</div><div class="handoff-meta">Source: <code>${esc(data.source)}</code> · Field: <code>${esc(data.field)}</code></div><div class="handoff-arrow" style="color:var(--green)">⬇️</div><div class="handoff-status" style="color:var(--green)">🚀 Auto-triggering Aadhaar/Ration Card API...</div>`;
+  } else if(state === 'notfound'){
+    el.classList.add('notfound');
+    el.innerHTML = `<div class="handoff-title">⚠️ No Aadhaar Found in Phone APIs</div><div class="handoff-status" style="color:var(--red)">None of the 4 phone APIs returned a valid 12-digit Aadhaar number</div><div class="handoff-meta">Phase 3 skipped</div>`;
+  }
+}
+
+/* ============================================================
+   HANDOFF TRIGGERS  ★★★ FIXED ★★★
+   ============================================================ */
+
+/* Try direct otpking.xyz mobile field first (dedicated source) */
+function getOtpkingDirectMobile(){
+  const otpking = ST.mR?.json;
+  if(!otpking) return null;
+  const directFields = ['mobile','Mobile','MOBILE','mobile_number','mobileNumber','mobile_no','mobileNo','phone','Phone','PHONE','phone_number','phoneNumber'];
+  for(const f of directFields){
+    const m = looksLikeIndianMobile(otpking[f]);
+    if(m) return { number: m, field: f };
+  }
+  return null;
+}
+
+/* Decide and apply phone handoff. Uses otpking as priority, falls back to others. */
+function resolveAndApplyPhoneHandoff(reason){
+  if(ST.phase2Started) return;
+
+  /* Priority 1: otpking dedicated field */
+  const direct = getOtpkingDirectMobile();
+  if(direct){
+    log(`⭐ ${reason} · otpking.xyz dedicated "${direct.field}" = ${direct.number}`, 'ok');
+    applyPhoneHandoff(direct.number, 'otpking.xyz', direct.field);
+    return;
+  }
+
+  /* Priority 2: collect candidates from ALL vehicle APIs, weighted by source */
+  const vehicleResponses = [
+    { name: 'otpking.xyz',                     json: ST.mR?.json,  sourcePriority: 100 },
+    { name: 'vehicleinfo-byrack.vercel.app',   json: ST.vR?.json,  sourcePriority: 50  },
+    { name: 'api-wd7m.onrender.com (vehicle)', json: ST.vdR?.json, sourcePriority: 40  }
+  ];
+  const best = extractPhoneFromVehicle(vehicleResponses);
+  if(best){
+    log(`🎯 ${reason} · Best candidate: +91 ${best.number} · source=${best.source} · path=${best.path} · score=${best.score}`, 'ok');
+    applyPhoneHandoff(best.number, best.source, best.path);
+    return;
+  }
+
+  /* Nothing found — only declare NOT FOUND when everything settled */
+  const allSettled = ['mR','vR','vdR'].every(k => ST[k] !== null);
+  if(allSettled){
+    log(`❌ ${reason} · No valid mobile in any vehicle API`, 'err');
+    ST.phase2Started = true;
+    ST.phase2Skipped = true;
+    setHandoff('notfound');
+    Object.keys(ST.phoneStates).forEach(k => { ST.phoneStates[k] = 'done'; });
+    ST.phoneCompleteFired = true;
+    ST.part3State = 'skipped';
+    ST.part3Started = true;
+    maybeFinalize();
+  } else {
+    setHandoff('waiting');
+  }
+}
+
+/* Called every time a vehicle API arrives */
+function tryHandoff(){
+  if(ST.phase2Started) return;
+
+  /* If otpking has already arrived and has a mobile → fire immediately */
+  if(ST.mR !== null){
+    const direct = getOtpkingDirectMobile();
+    if(direct){
+      resolveAndApplyPhoneHandoff('otpking arrived with mobile');
+      return;
+    }
+  }
+
+  /* If all three have arrived and otpking has no mobile → fallback scan */
+  const allSettled = ['mR','vR','vdR'].every(k => ST[k] !== null);
+  if(allSettled){
+    resolveAndApplyPhoneHandoff('all vehicle APIs settled');
+    return;
+  }
+
+  /* otpking is still pending OR arrived without a mobile.
+     Set a wait timer so we don't hang forever if otpking never returns. */
+  setHandoff('waiting');
+  if(!otpkingWaitTimer){
+    const WAIT_MS = 12000; // 12s max wait for otpking
+    log(`⏳ Waiting up to ${WAIT_MS/1000}s for otpking.xyz before fallback scan...`, 'info');
+    otpkingWaitTimer = setTimeout(() => {
+      otpkingWaitTimer = null;
+      if(ST.phase2Started) return;
+      log(`⏱️ otpking wait timeout — forcing fallback scan`, 'warn');
+      resolveAndApplyPhoneHandoff('otpking wait timeout');
+    }, WAIT_MS);
+  }
+}
+
+function applyPhoneHandoff(number, source, field){
+  if(ST.phase2Started) return;
+  log(`🎯 Phone extracted: +91 ${number} from ${source} (field: ${field})`, 'ok');
+  ST.phase2Started = true;
+  ST.phone = number;
+  ST.phoneSource = source;
+  ST.phoneField = field;
+  if(otpkingWaitTimer){ clearTimeout(otpkingWaitTimer); otpkingWaitTimer = null; }
+  setHandoff('found', { number, source, field });
+  if(phase2Timer) clearTimeout(phase2Timer);
+  phase2Timer = setTimeout(() => { phase2Timer = null; startPhase2(number, source, field); }, 450);
+}
+
+/* ============================================================
+   PHASE 2
+   ============================================================ */
+function startPhase2(number, source, field){
+  log(`🚀 PHASE 2 STARTED · +91 ${number} · ${source}`, 'step');
+  const hdr = document.getElementById('phone-header');
+  if(hdr){
+    hdr.innerHTML = `<div class="section-divider">📱 PART 2 · PHONE OSINT <span class="pill">+91 ${esc(number)}</span><small>Extracted from ${esc(source)} (field: ${esc(field)}) · 4 phone APIs running</small></div>`;
+  }
+  ['nR','lR','aR','l2R'].forEach(k => {
+    const el = document.getElementById(`phone-${k}`);
+    const label = k==='nR' ? 'Mobile Info' : k==='lR' ? 'Breach Intel' : k==='aR' ? 'Identity/Aadhaar' : 'Leak Intel';
+    if(el) el.innerHTML = `<div class="loading-card"><div class="spinner"></div> Fetching ${label} for +91 ${esc(number)}...</div>`;
+  });
+  phoneFetch('nR', number).then(r => { ST.nR = r; ST.phoneStates.nR = r.json ? 'done' : (r.httpStatus===404 ? 'nodata' : 'fail'); const el = document.getElementById('phone-nR'); if(el) el.innerHTML = renderMobileSection(r, number); log(`nR: ${ST.phoneStates.nR}`, 'ok'); checkPhoneComplete(); });
+  phoneFetch('lR', number).then(r => { ST.lR = r; ST.phoneStates.lR = r.json ? 'done' : (r.httpStatus===404 ? 'nodata' : 'fail'); const el = document.getElementById('phone-lR'); if(el) el.innerHTML = renderLeakSection(r); log(`lR: ${ST.phoneStates.lR}`, 'ok'); checkPhoneComplete(); });
+  phoneFetch('aR', number).then(r => { ST.aR = r; ST.phoneStates.aR = r.json ? 'done' : (r.httpStatus===404 ? 'nodata' : 'fail'); const el = document.getElementById('phone-aR'); if(el) el.innerHTML = renderAadharSection(r); log(`aR: ${ST.phoneStates.aR}`, 'ok'); checkPhoneComplete(); });
+  phoneFetch('l2R', number).then(r => { ST.l2R = r; ST.phoneStates.l2R = r.json ? 'done' : (r.httpStatus===404 ? 'nodata' : 'fail'); const el = document.getElementById('phone-l2R'); if(el) el.innerHTML = renderLeak2Section(r); log(`l2R: ${ST.phoneStates.l2R}`, 'ok'); checkPhoneComplete(); });
+}
+function checkPhoneComplete(){
+  if(ST.phoneCompleteFired) return;
+  const pDone = Object.values(ST.phoneStates).every(s => s==='done'||s==='fail'||s==='nodata');
+  if(!pDone) return;
+  ST.phoneCompleteFired = true;
+  log(`✅ All 4 phone APIs settled → checking Aadhaar`, 'step');
+  const wrapper = $('part3Wrapper');
+  if(wrapper) wrapper.style.display = 'block';
+  setPart3Handoff('waiting');
+  setTimeout(tryAadharHandoff, 200);
+}
+function tryAadharHandoff(){
+  if(ST.part3Started) return;
+  const order = [
+    { key:'aR', name:'number-info-what.vercel.app' },
+    { key:'lR', name:'number-info-for-my-rasmalai-ayushi.vercel.app' },
+    { key:'nR', name:'anshapi.vercel.app' },
+    { key:'l2R', name:'api-wd7m.onrender.com (leak)' }
+  ];
+  for(const {key, name} of order){
+    const resp = ST[key];
+    if(!resp || !resp.json) continue;
+    const found = deepFindAadhar(resp.json);
+    if(found){
+      log(`🎯 Aadhaar: ${maskAadhar(found.aadhar)} from ${name} (path: ${found.path})`, 'ok');
+      ST.part3Started = true; ST.aadhar = found.aadhar; ST.aadharSource = name; ST.aadharField = found.path; ST.part3State = 'active';
+      setPart3Handoff('found', { aadhar: found.aadhar, source: name, field: found.path });
+      if(phase3Timer) clearTimeout(phase3Timer);
+      phase3Timer = setTimeout(() => { phase3Timer = null; startPhase3(found.aadhar, name, found.path); }, 450);
+      return;
+    }
+  }
+  log('❌ No Aadhaar found in phone responses', 'err');
+  ST.part3Started = true; ST.part3Skipped = true; ST.part3State = 'skipped';
+  setPart3Handoff('notfound');
+  maybeFinalize();
+}
+function startPhase3(aadhar, source, field){
+  log(`🚀 PHASE 3 STARTED · Aadhaar = ${maskAadhar(aadhar)}`, 'step');
+  const hdr = document.getElementById('part3-header');
+  if(hdr){
+    hdr.innerHTML = `<div class="section-divider">🆔 PART 3 · AADHAAR / RATION CARD INTEL <span class="pill">${esc(maskAadhar(aadhar))}</span><small>Extracted from ${esc(source)} (field: ${esc(field)}) · 1 Aadhaar API running</small></div>`;
+  }
+  const el = document.getElementById('part3-content');
+  if(el) el.innerHTML = `<div class="loading-card"><div class="spinner"></div> Fetching Aadhaar family info for ${esc(maskAadhar(aadhar))}...</div>`;
+  aadharInfoFetch(aadhar).then(r => {
+    ST.aadharResp = r;
+    ST.part3State = r.json ? 'done' : (r.httpStatus===404 ? 'nodata' : 'fail');
+    const el2 = document.getElementById('part3-content');
+    if(el2) el2.innerHTML = renderPart3Section(r, aadhar);
+    log(`Aadhaar API: ${ST.part3State}`, ST.part3State==='done'?'ok':'warn');
+    maybeFinalize();
+  });
+}
+
+/* ============================================================
+   FINALIZE  ★★★ FIXED for phone-only mode ★★★
+   ============================================================ */
+function maybeFinalize(){
+  const isPhoneMode = ST.mode === 'phone';
+  const vDone = isPhoneMode || [ST.mState, ST.vState, ST.vdState].every(s => s==='done'||s==='fail');
+  const pDone = Object.values(ST.phoneStates).every(s => s==='done'||s==='fail'||s==='nodata');
+  const a3Done = ['done','fail','nodata','skipped'].includes(ST.part3State);
+  if(!vDone || !pDone || !a3Done) return;
+  const wasDone = ST.allDone;
+  ST.allDone = true;
+  renderSummary();
+  if(!wasDone){
+    log('✅ Pipeline complete', 'ok');
+    $('status').className = 'status';
+    $('searchBtn').disabled = false;
+    $('searchBtn').textContent = '🔍 Search';
+  }
+}
+function renderSummary(){
+  const sum = document.getElementById('summary');
+  if(!sum) return;
+  const stOK = s => s==='done' ? '✅ OK' : s==='nodata' ? '⚠️ No data' : s==='fail' ? '❌ Failed' : s==='active' ? '⏳ Running' : '⏭️ Skipped';
+  let rowsHtml = '';
+  if(ST.mode === 'phone'){
+    rowsHtml = row('Query (Mobile Number)', ST.query)+
+      row('Aadhaar Extracted', ST.aadhar ? maskAadhar(ST.aadhar) : '—')+
+      row('Aadhaar Source', ST.aadharSource ? `${ST.aadharSource} (field: ${ST.aadharField})` : '—')+
+      row('1. /api/number (Mobile Info)', stOK(ST.phoneStates.nR))+
+      row('2. /api/leak (Breach Intel)', stOK(ST.phoneStates.lR))+
+      row('3. /api/aadhar (Identity)', stOK(ST.phoneStates.aR))+
+      row('4. /api/leak2 (Leak Intel)', stOK(ST.phoneStates.l2R))+
+      row('5. family-infobyansh (Aadhaar Family)', ST.aadhar ? stOK(ST.part3State) : '⏭️ Skipped');
+  } else {
+    rowsHtml = row('Query (Vehicle No.)', ST.query)+
+      row('Extracted Mobile', ST.phone ? `+91 ${ST.phone}` : '—')+
+      row('Mobile Source', ST.phoneSource ? `${ST.phoneSource} (field: ${ST.phoneField})` : '—')+
+      row('Extracted Aadhaar', ST.aadhar ? maskAadhar(ST.aadhar) : '—')+
+      row('Aadhaar Source', ST.aadharSource ? `${ST.aadharSource} (field: ${ST.aadharField})` : '—')+
+      row('1. otpking.xyz (vehicle)', stOK(ST.mState))+
+      row('2. vehicleinfo-byrack.vercel.app', stOK(ST.vState))+
+      row('3. api-wd7m.onrender.com (vehicle)', stOK(ST.vdState))+
+      row('4. /api/number (Mobile Info)', ST.phone ? stOK(ST.phoneStates.nR) : '⏭️ Skipped')+
+      row('5. /api/leak (Breach Intel)', ST.phone ? stOK(ST.phoneStates.lR) : '⏭️ Skipped')+
+      row('6. /api/aadhar (Identity)', ST.phone ? stOK(ST.phoneStates.aR) : '⏭️ Skipped')+
+      row('7. /api/leak2 (Leak Intel)', ST.phone ? stOK(ST.phoneStates.l2R) : '⏭️ Skipped')+
+      row('8. family-infobyansh (Aadhaar Family)', ST.aadhar ? stOK(ST.part3State) : '⏭️ Skipped');
+  }
+  sum.innerHTML = `<div class="sec-title">📡 Complete Fetch Status Summary</div>
+    <div class="card full"><div class="card-body">${rowsHtml}</div></div>
+    <div class="download-block">
+      <h3>📥 DOWNLOAD COMPLETE REPORT</h3>
+      <p>Every field, every API, every family member — cleanly formatted in a single printable table.<br>White background · black text · print-ready PDF.</p>
+      <button type="button" class="btn big" id="downloadBtn">📥 Download Full Report (PDF)</button>
+    </div>
+    <div class="footer">Report generated ${new Date().toLocaleString('en-IN')} · Vehicle → Phone → Aadhaar OSINT</div>`;
+
+  const dlBtn = document.getElementById('downloadBtn');
+  if(dlBtn) dlBtn.addEventListener('click', downloadReport);
+}
+
+/* ============================================================
+   RETRY
+   ============================================================ */
+async function retryPhoneApi(key){
+  if(!ST.phone) return;
+  const el = document.getElementById(`phone-${key}`);
+  if(el) el.innerHTML = `<div class="loading-card"><div class="spinner"></div> Retrying ${key}...</div>`;
+  ST.phoneStates[key] = 'active';
+  const r = await phoneFetch(key, ST.phone);
+  ST[key] = r;
+  ST.phoneStates[key] = r.json ? 'done' : (r.httpStatus===404 ? 'nodata' : 'fail');
+  if(el){
+    if(key==='nR') el.innerHTML = renderMobileSection(r, ST.phone);
+    if(key==='lR') el.innerHTML = renderLeakSection(r);
+    if(key==='aR') el.innerHTML = renderAadharSection(r);
+    if(key==='l2R') el.innerHTML = renderLeak2Section(r);
+  }
+  checkPhoneComplete(); maybeFinalize();
+}
+async function retryAadharApi(){
+  if(!ST.aadhar) return;
+  const el = document.getElementById('part3-content');
+  if(el) el.innerHTML = `<div class="loading-card"><div class="spinner"></div> Retrying Aadhaar API...</div>`;
+  ST.part3State = 'active';
+  const r = await aadharInfoFetch(ST.aadhar);
+  ST.aadharResp = r;
+  ST.part3State = r.json ? 'done' : (r.httpStatus===404 ? 'nodata' : 'fail');
+  if(el) el.innerHTML = renderPart3Section(r, ST.aadhar);
+  maybeFinalize();
+}
+
+/* ============================================================
+   MAIN SEARCH
+   ============================================================ */
+async function doSearch(){
+  try{
+    const rawEl = $('inp');
+    if(!rawEl){ alert('Input not found'); return; }
+    const raw = rawEl.value.trim().toUpperCase().replace(/\s+/g,'');
+    if(raw.length < 6){ alert('Enter a valid vehicle number (e.g. UP53BC4364) or 10-digit mobile'); return; }
+    const isPhoneOnly = /^[6-9]\d{9}$/.test(raw);
+
+    if(phase2Timer){ clearTimeout(phase2Timer); phase2Timer = null; }
+    if(phase3Timer){ clearTimeout(phase3Timer); phase3Timer = null; }
+    if(otpkingWaitTimer){ clearTimeout(otpkingWaitTimer); otpkingWaitTimer = null; }
+
+    Object.assign(ST, {
+      query: raw, mode: isPhoneOnly ? 'phone' : 'vehicle',
+      mR:null, vR:null, vdR:null, mState:'pending', vState:'pending', vdState:'pending',
+      phone:null, phoneSource:null, phoneField:null, phase2Started:false, phase2Skipped:false,
+      nR:null, lR:null, aR:null, l2R:null,
+      phoneStates:{ nR:'pending', lR:'pending', aR:'pending', l2R:'pending' },
+      phoneCompleteFired:false,
+      aadhar:null, aadharSource:null, aadharField:null,
+      part3Started:false, part3Skipped:false, part3State:'pending',
+      aadharResp:null, allDone:false
+    });
+
+    clearDebug();
+    $('debugToggle').classList.add('show');
+    log(`=== New search: ${raw} (${isPhoneOnly ? 'phone' : 'vehicle → phone → aadhaar'}) ===`, 'step');
+
+    const banner = $('banner'); if(banner){ banner.className = 'banner'; }
+    const status = $('status'), statusTxt = $('statusTxt'), searchBtn = $('searchBtn');
+    const hint = $('hint');
+
+    if(location.protocol === 'file:'){
+      const bannerEl = $('banner');
+      bannerEl.className = 'banner show';
+      bannerEl.innerHTML = '⚠️ <b>Local file mode (file://):</b> Browser may block all API fetches. If results fail, deploy to Vercel/Netlify or run <code>python3 -m http.server 8000</code> and open <code>http://localhost:8000/</code>. Continuing anyway...';
+    }
+
+    if(hint) hint.style.display = 'none';
+    $('results').innerHTML = '';
+    searchBtn.disabled = true;
+    searchBtn.textContent = '⏳ Fetching...';
+    status.className = 'status show';
+
+    if(isPhoneOnly){
+      statusTxt.textContent = `Phone + Aadhaar OSINT for +91 ${raw}...`;
+      $('results').innerHTML = `
+        <div class="reg-hero"><div class="reg-plate">${esc(raw)}</div></div>
+        <div id="phone-header"><div class="section-divider">📱 PHONE OSINT · Direct Mobile Search <span class="pill">+91 ${esc(raw)}</span><small>4 phone APIs running</small></div></div>
+        <div id="phone-nR"></div><div id="phone-lR"></div><div id="phone-aR"></div><div id="phone-l2R"></div>
+        <div id="part3Wrapper" style="display:none">
+          <div id="part3Handoff" class="handoff-card"><div class="handoff-title">🔗 Phase 2 → Phase 3 · Aadhaar Handoff</div><div class="handoff-status">🔍 Scanning phone API responses for an Aadhaar number...</div></div>
+          <div id="part3-header"></div><div id="part3-content"></div>
+        </div>
+        <div id="summary"></div>`;
+      ['nR','lR','aR','l2R'].forEach(k => {
+        const label = k==='nR' ? 'Mobile Info' : k==='lR' ? 'Breach Intel' : k==='aR' ? 'Identity/Aadhaar' : 'Leak Intel';
+        const el = document.getElementById(`phone-${k}`);
+        if(el) el.innerHTML = `<div class="loading-card"><div class="spinner"></div> Fetching ${label}...</div>`;
+      });
+      ['nR','lR','aR','l2R'].forEach(k => {
+        phoneFetch(k, raw).then(r => {
+          ST[k] = r; ST.phoneStates[k] = r.json ? 'done' : (r.httpStatus===404 ? 'nodata' : 'fail');
+          const el = document.getElementById(`phone-${k}`);
+          if(el){
+            if(k==='nR') el.innerHTML = renderMobileSection(r, raw);
+            if(k==='lR') el.innerHTML = renderLeakSection(r);
+            if(k==='aR') el.innerHTML = renderAadharSection(r);
+            if(k==='l2R') el.innerHTML = renderLeak2Section(r);
+          }
+          checkPhoneComplete();
+        });
+      });
+      return;
+    }
+
+    statusTxt.textContent = `Fetching vehicle + phone + aadhaar for ${raw}...`;
+    $('results').innerHTML = `
+      <div class="reg-hero"><div class="reg-plate">${esc(raw)}</div></div>
+      <div class="section-divider">🚗 PART 1 · VEHICLE OSINT <small>3 vehicle APIs running in parallel</small></div>
+      <div class="sec-title">🔹 Source 1: otpking.xyz (Mobile &amp; Chassis) — PRIMARY</div>
+      <div id="vehicle-mR"><div class="loading-card"><div class="spinner"></div> Fetching otpking.xyz...</div></div>
+      <div class="sec-title">🔹 Source 2: vehicleinfo-byrack.vercel.app</div>
+      <div id="vehicle-vR"><div class="loading-card"><div class="spinner"></div> Fetching vehicleinfo-byrack...</div></div>
+      <div class="sec-title">🔹 Source 3: api-wd7m.onrender.com (vehicle)</div>
+      <div id="vehicle-vdR"><div class="loading-card"><div class="spinner"></div> Fetching api-wd7m...</div></div>
+      <div id="handoffCard" class="handoff-card"><div class="handoff-title">🔗 Phase 1 → Phase 2 · Mobile Handoff</div><div class="handoff-status">🔍 Waiting for otpking.xyz (primary mobile source)...</div><div class="handoff-meta">Fallback sources: vehicleinfo-byrack & api-wd7m</div></div>
+      <div id="phone-header"></div>
+      <div id="phone-nR"></div><div id="phone-lR"></div><div id="phone-aR"></div><div id="phone-l2R"></div>
+      <div id="part3Wrapper" style="display:none">
+        <div id="part3Handoff" class="handoff-card"><div class="handoff-title">🔗 Phase 2 → Phase 3 · Aadhaar Handoff</div><div class="handoff-status">🔍 Scanning phone API responses for an Aadhaar number...</div></div>
+        <div id="part3-header"></div><div id="part3-content"></div>
+      </div>
+      <div id="summary"></div>`;
+
+    function onVehicleArrive(key, resp){
+      ST[key] = resp;
+      const stateKey = key==='mR' ? 'mState' : key==='vR' ? 'vState' : 'vdState';
+      ST[stateKey] = resp.json ? 'done' : 'fail';
+      const el = document.getElementById(`vehicle-${key}`);
+      if(el){
+        if(key==='mR') el.innerHTML = renderVehicleOtpking(resp);
+        if(key==='vR') el.innerHTML = renderVehicleVdetail(resp, 'vehicleinfo-byrack.vercel.app', '0.14s');
+        if(key==='vdR') el.innerHTML = renderVehicleVdetail(resp, 'api-wd7m.onrender.com (vehicle)', '0.18s');
+      }
+      tryHandoff(); maybeFinalize();
+    }
+    mobileFetch(raw).then(r => onVehicleArrive('mR', r));
+    vehicleInfoFetch(raw).then(r => onVehicleArrive('vR', r));
+    vdetailFetch(raw).then(r => onVehicleArrive('vdR', r));
+  }catch(err){
+    console.error('[doSearch error]', err);
+    const banner = $('banner');
+    if(banner){
+      banner.className = 'banner show';
+      banner.style.color = '#ff4757';
+      banner.style.background = 'rgba(255,71,87,.1)';
+      banner.style.borderColor = 'rgba(255,71,87,.3)';
+      banner.innerHTML = '⚠️ <b>Search Error:</b> ' + (err.message || err) + '<br>Open DevTools (F12) → Console for details.';
+    }
+    const searchBtn = $('searchBtn');
+    if(searchBtn){ searchBtn.disabled = false; searchBtn.textContent = '🔍 Search'; }
+    const status = $('status');
+    if(status) status.className = 'status';
+  }
+}
+
+/* ============================================================
+   CLEAN TEXT-TABLE PDF REPORT
+   ============================================================ */
+function collectVehicleOtpkingRows(rows){
+  const api = ST.mR?.json;
+  if(!api){ rows.push(['Status', '❌ Fetch Failed']); rows.push(['Error', ST.mR?.parseError || 'No response']); return; }
+  rows.push(['Mobile Number', get(api,'mobile') ? '+91 '+get(api,'mobile') : '—']);
+  rows.push(['Vehicle (Echoed)', get(api,'vehicle') || '—']);
+  rows.push(['Chassis (Full)', get(api,'chassis_full') || '—']);
+  rows.push(['Chassis (Last 5)', get(api,'chassis_last5') || '—']);
+  rows.push(['Chassis Source', get(api,'chassis_source') || '—']);
+  rows.push(['API Success', api.success!==undefined ? String(api.success) : '—']);
+}
+function collectVdetailRows(rows, resp){
+  const api = resp?.json;
+  if(!api){ rows.push(['Status', '❌ Fetch Failed']); rows.push(['Error', resp?.parseError || 'No response']); return; }
+  const data = get(api,'data',{}) || {};
+  const rtoD = get(data,'response.rtoData',{}) || {};
+  const respD = get(data,'response',{}) || {};
+  const all = [
+    ['RTO Name', get(rtoD,'rtoName')], ['RTO Code', get(rtoD,'rtoCode') || get(respD,'rtoCode')],
+    ['State', get(rtoD,'statename')], ['RTO Active', rtoD.isActive!==undefined ? String(rtoD.isActive) : null],
+    ['Registration Authority', get(respD,'regAuthority')], ['Registration No', get(respD,'regNo')],
+    ['Registration Date', fmtDate(get(respD,'regDate')) || get(respD,'regDate')],
+    ['Record ID', get(respD,'id')], ['RTO ID', get(respD,'rtoId')],
+    ['Combined ID', get(rtoD,'combindID')], ['Order By', get(rtoD,'orderBy')],
+    ['Manufacturer', get(respD,'manufacturer')], ['Manufacturer ID', get(respD,'manufacturerId')],
+    ['Manufacturer Month/Year', get(respD,'manufacturerMonthYear')], ['Manufacturer Year', get(respD,'manufacturerYear')],
+    ['Vehicle', get(respD,'vehicle')], ['Vehicle ID', get(respD,'vehicleId')],
+    ['Vehicle Type', get(respD,'vehicleType')], ['Vehicle Class', get(respD,'vehicleClass')],
+    ['Vehicle Age', get(respD,'vehicleAge')], ['Variant', get(respD,'variant')],
+    ['Variant ID', get(respD,'variantID')], ['Fuel Type', get(respD,'fuelType')],
+    ['Fuel ID', get(respD,'fuelId')], ['Cubic Capacity', get(respD,'cubicCapacity')],
+    ['Seat Capacity', get(respD,'seatCapacity')],
+    ['Is Commercial', respD.isCommercial!==undefined ? String(respD.isCommercial) : null],
+    ['Chassis', get(respD,'chassis')], ['Engine', get(respD,'engine')],
+    ['Owner', get(respD,'owner')], ["Owner's Father Name", get(respD,'ownerFatherName')],
+    ['Financer', get(respD,'financerName')], ['Present Address', get(respD,'presentAddress')],
+    ['Permanent Address', get(respD,'permAddress')], ['Pincode', get(respD,'pincode')],
+    ['Insurance Company', get(respD,'insuranceCompanyName')], ['Insurance Company Code', get(respD,'insuranceCompanyCode')],
+    ['Insurance Policy Number', get(respD,'insurancePolicyNumber')],
+    ['Insurance Valid Upto', fmtDate(get(respD,'insuranceUpto')) || get(respD,'insuranceUpto')],
+    ['Insurance Expired', respD.insuranceExpired!==undefined ? String(respD.insuranceExpired) : null],
+    ['PUCC Number', get(respD,'puccNumber')],
+    ['PUCC Valid Upto', fmtDate(get(respD,'puccValidUpto')) || get(respD,'puccValidUpto')],
+    ['Status Code', get(respD,'status')], ['Status Description', get(respD,'statusDesc')],
+    ['Data Status', get(respD,'dataStatus')], ['Entry Date', get(respD,'eDate')],
+    ['Last Modified Date', get(respD,'lmDate')]
+  ];
+  all.forEach(([l,v]) => { if(valid(v)) rows.push([l, String(v)]); });
+}
+function collectPhoneMobileRows(rows, resp, number){
+  const api = resp?.json;
+  if(!api){ rows.push(['Status', '❌ Fetch Failed']); rows.push(['Error', resp?.parseError || 'No response']); return; }
+  const data = api?.data || {};
+  const inner = data?.Data || {};
+  const records = Array.isArray(inner.Main_Records) ? inner.Main_Records : [];
+  const altRecords = Array.isArray(inner.Alt_Records) ? inner.Alt_Records : [];
+  rows.push(['Status', api.status===true ? '✅ SUCCESS' : ('⚠️ '+(data.status||'Response Returned'))]);
+  rows.push(['HTTP Status', String(resp?.httpStatus ?? '—')]);
+  rows.push(['Data Status', data.status || '—']);
+  rows.push(['Developer', data.Developer || '—']);
+  rows.push(['Credit', api.credit || '—']);
+  rows.push(['Fetch Path', resp?._via === 'proxy-fallback' ? 'Direct (CORS Proxy)' : 'Serverless /api/number']);
+  rows.push(['Main Records Count', String(records.length)]);
+  rows.push(['Alternate Records Count', String(altRecords.length)]);
+  records.forEach((r,i) => {
+    rows.push({ type:'member', text:`Main Record ${i+1}` });
+    Object.keys(r).forEach(k => {
+      const v = r[k];
+      if(v===undefined || v===null || String(v).trim()==='') return;
+      let val = String(v);
+      if(/aadhar|aadhaar|uid|record.?id/i.test(k) && val.replace(/\D/g,'').length === 12) val = maskAadhar(val);
+      rows.push([humanizeKey(k), val]);
+    });
+  });
+  altRecords.forEach((r,i) => {
+    rows.push({ type:'member', text:`Alternate Record ${i+1}` });
+    Object.keys(r).forEach(k => {
+      const v = r[k];
+      if(v===undefined || v===null || String(v).trim()==='') return;
+      rows.push([humanizeKey(k), String(v)]);
+    });
+  });
+}
+function collectPhoneLeakRows(rows, resp){
+  const api = resp?.json;
+  if(!api){ rows.push(['Status', '❌ Fetch Failed']); rows.push(['Error', resp?.parseError || 'No response']); return; }
+  const d = api?.data || {};
+  const results = Array.isArray(d.result) ? d.result : [];
+  rows.push(['Status', api.status===true ? '✅ SUCCESS' : '⚠️ Response Returned']);
+  rows.push(['HTTP Status', String(resp?.httpStatus ?? '—')]);
+  rows.push(['Data Success', safeStr(d.success)]);
+  rows.push(['Query Number', api.number || '—']);
+  rows.push(['Records Found', String(results.length)]);
+  rows.push(['Timestamp', api.timestamp || '—']);
+  rows.push(['Fetch Path', resp?._via === 'proxy-fallback' ? 'Direct (CORS Proxy)' : 'Serverless /api/leak']);
+  results.forEach((r,i) => {
+    rows.push({ type:'member', text:`Leak Record ${i+1}` });
+    Object.keys(r).forEach(k => {
+      const v = r[k];
+      if(v===undefined || v===null || String(v).trim()==='') return;
+      let val = String(v);
+      if(/aadhar|aadhaar|uid/i.test(k) && val.replace(/\D/g,'').length === 12) val = maskAadhar(val);
+      rows.push([humanizeKey(k), val]);
+    });
+  });
+}
+function collectPhoneAadharRows(rows, resp){
+  const api = resp?.json;
+  if(!api){ rows.push(['Status', '❌ Fetch Failed']); rows.push(['Error', resp?.parseError || 'No response']); return; }
+  const d = api?.data || {};
+  const results = Array.isArray(d.results) ? d.results : [];
+  rows.push(['Status', api.success===true ? '✅ SUCCESS' : '⚠️ Response Returned']);
+  rows.push(['HTTP Status', String(resp?.httpStatus ?? '—')]);
+  rows.push(['Data Success', safeStr(d.success)]);
+  rows.push(['Mode', api.mode || '—']);
+  rows.push(['Query', d.query || '—']);
+  rows.push(['Number', d.number || '—']);
+  rows.push(['Count', safeStr(d.count)]);
+  rows.push(['Total', safeStr(d.total)]);
+  rows.push(['Searched Fields', Array.isArray(d.searched_fields) ? d.searched_fields.join(', ') : (d.searched_fields || '—')]);
+  rows.push(['Fetch Path', resp?._via === 'proxy-fallback' ? 'Direct (CORS Proxy)' : 'Serverless /api/aadhar']);
+  results.forEach((r,i) => {
+    rows.push({ type:'member', text:`Identity Record ${i+1}` });
+    Object.keys(r).forEach(k => {
+      if(k === 'connected_numbers') return;
+      const v = r[k];
+      if(v===undefined || v===null || String(v).trim()==='') return;
+      let val = String(v);
+      if(/aadhar|aadhaar|uid/i.test(k) && val.replace(/\D/g,'').length === 12) val = maskAadhar(val);
+      rows.push([humanizeKey(k), val]);
+    });
+    const connected = Array.isArray(r.connected_numbers) ? r.connected_numbers : [];
+    if(connected.length){
+      rows.push({ type:'member', text:`Connected Numbers` });
+      connected.forEach(c => {
+        Object.keys(c).forEach(ck => { rows.push([humanizeKey(ck), String(c[ck])]); });
+      });
+    }
+  });
+}
+function collectPhoneLeak2Rows(rows, resp){
+  const api = resp?.json;
+  if(!api){ rows.push(['Status', '❌ Fetch Failed']); rows.push(['Error', resp?.parseError || 'No response']); return; }
+  const d = api?.data || {};
+  const sources = d?.data || {};
+  const sourceKeys = Object.keys(sources);
+  rows.push(['Status', (api.success===true || api.status===true) ? '✅ SUCCESS' : '⚠️ Response Returned']);
+  rows.push(['HTTP Status', String(resp?.httpStatus ?? '—')]);
+  rows.push(['API Used', api.api_used || '—']);
+  rows.push(['Query', d.query || '—']);
+  rows.push(['Type', api.type || '—']);
+  rows.push(['Key', api.key || '—']);
+  rows.push(['Limit', safeStr(api.limit)]);
+  rows.push(['Remaining', safeStr(api.remaining)]);
+  rows.push(['Response Time', d.response_time_ms || '—']);
+  rows.push(['Sources Found', String(sourceKeys.length)]);
+  rows.push(['Fetch Path', resp?._via === 'proxy-fallback' ? 'Direct (CORS Proxy)' : 'Serverless /api/leak2']);
+  sourceKeys.forEach((srcKey, i) => {
+    const src = sources[srcKey] || {};
+    const records = Array.isArray(src.records) ? src.records : [];
+    rows.push({ type:'member', text:`Source ${i+1} · ${src.title || srcKey} (${records.length} records)` });
+    Object.keys(src).forEach(k => {
+      if(k === 'records') return;
+      const v = src[k];
+      if(v===undefined || v===null || String(v).trim()==='') return;
+      rows.push([humanizeKey(k), String(v)]);
+    });
+    records.forEach((rec, ri) => {
+      rows.push({ type:'member', text:`Record ${ri+1}` });
+      Object.keys(rec).forEach(k => { rows.push([humanizeKey(k), String(rec[k])]); });
+    });
+  });
+}
+function collectAadharFamilyRows(rows, resp){
+  const api = resp?.json;
+  if(!api){ rows.push(['Status', '❌ Fetch Failed']); rows.push(['Error', resp?.parseError || 'No response']); return; }
+  const data = api?.data || {};
+  const pd = data?.pd || {};
+  const credit = api?.credit || {};
+  const members = Array.isArray(pd?.memberDetailsList) ? pd.memberDetailsList : [];
+  rows.push(['Status', api.status === 'success' ? '✅ SUCCESS' : ('⚠️ '+(api.status||'Response Returned'))]);
+  rows.push(['Aadhaar (Masked)', api.aadhaar || '—']);
+  rows.push(['Ration Card No.', api.ration_card || '—']);
+  rows.push(['Source', api.source || '—']);
+  rows.push(['Response Time', api.response_time || '—']);
+  rows.push(['Timestamp', api.timestamp || '—']);
+  rows.push(['Fetch Path', resp?._via === 'proxy-fallback' ? 'Direct (CORS Proxy)' : 'Direct']);
+  if(credit.made_by || credit.username){
+    rows.push(['Made By', credit.made_by || '—']);
+    rows.push(['Username', credit.username || '—']);
+  }
+  rows.push({ type:'member', text:'Ration Card / Personal Details' });
+  const pdFields = [
+    ['Home State', pd.homeStateName], ['Home State Code', pd.homeStateCode],
+    ['Home District', pd.homeDistName], ['District Code', pd.districtCode],
+    ['Address', pd.address], ['FPS ID', pd.fpsId], ['RC ID', pd.rcId],
+    ['Ration Card (rc)', data.rc], ['Scheme ID', pd.schemeId], ['Scheme Name', pd.schemeName],
+    ['Allowed On ORC', pd.allowed_onorc], ['Dup UID Status', pd.dup_uid_status],
+    ['Record Status (rd)', data.rd], ['Record Status (rs)', data.rs]
+  ];
+  pdFields.forEach(([l,v]) => { if(valid(v)) rows.push([l, String(v)]); });
+  if(members.length){
+    rows.push({ type:'member', text:`Family Members (${members.length})` });
+    members.forEach((m, i) => {
+      rows.push({ type:'member', text:`Member ${i+1} · ${m.memberName || 'Unknown'}` });
+      rows.push(['Member ID', m.memberId || '—']);
+      rows.push(['Name', m.memberName || '—']);
+      rows.push(['Relationship', m.releationship_name || '—']);
+      rows.push(['Relationship Code', m.relationship_code || '—']);
+      rows.push(['UID Linked', m.uid || '—']);
+    });
+  }
+}
+
+function buildTextReportHTML(){
+  const now = new Date().toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  const rows = [];
+  rows.push(['Query', ST.query]);
+  rows.push(['Mode', ST.mode === 'phone' ? 'Direct Mobile Search' : 'Vehicle → Phone → Aadhaar']);
+  rows.push(['Report Generated', now]);
+  if(ST.phone) rows.push(['Extracted Mobile', '+91 ' + ST.phone]);
+  if(ST.aadhar) rows.push(['Extracted Aadhaar', maskAadhar(ST.aadhar)]);
+
+  if(ST.mode !== 'phone'){
+    rows.push({ type:'section', text:'PART 1 · VEHICLE OSINT' });
+    rows.push({ type:'subsection', text:'Source 1 · otpking.xyz' });
+    collectVehicleOtpkingRows(rows);
+    rows.push({ type:'subsection', text:'Source 2 · vehicleinfo-byrack.vercel.app' });
+    collectVdetailRows(rows, ST.vR);
+    rows.push({ type:'subsection', text:'Source 3 · api-wd7m.onrender.com (vehicle)' });
+    collectVdetailRows(rows, ST.vdR);
+  }
+  if(ST.phone){
+    rows.push({ type:'section', text:'PART 2 · PHONE OSINT · +91 ' + ST.phone });
+    rows.push({ type:'subsection', text:'API 1 · Mobile Information (anshapi.vercel.app)' });
+    collectPhoneMobileRows(rows, ST.nR, ST.phone);
+    rows.push({ type:'subsection', text:'API 2 · Breach & Leak Intelligence (rasmalai)' });
+    collectPhoneLeakRows(rows, ST.lR);
+    rows.push({ type:'subsection', text:'API 3 · Identity / Aadhaar Intelligence (number-info-what)' });
+    collectPhoneAadharRows(rows, ST.aR);
+    rows.push({ type:'subsection', text:'API 4 · Leak Intelligence (api-wd7m)' });
+    collectPhoneLeak2Rows(rows, ST.l2R);
+  } else {
+    rows.push({ type:'section', text:'PART 2 · PHONE OSINT · SKIPPED (No mobile found)' });
+  }
+  if(ST.aadhar){
+    rows.push({ type:'section', text:'PART 3 · AADHAAR / RATION CARD INTEL · ' + maskAadhar(ST.aadhar) });
+    collectAadharFamilyRows(rows, ST.aadharResp);
+  } else if(ST.mode === 'vehicle'){
+    rows.push({ type:'section', text:'PART 3 · AADHAAR / RATION CARD INTEL · SKIPPED (No Aadhaar found)' });
+  }
+
+  let tbody = '';
+  for(const r of rows){
+    if(r.type === 'section'){ tbody += `<tr class="section"><td colspan="2">${esc(r.text)}</td></tr>`; }
+    else if(r.type === 'subsection'){ tbody += `<tr class="subsection"><td colspan="2">${esc(r.text)}</td></tr>`; }
+    else if(r.type === 'member'){ tbody += `<tr class="member"><td colspan="2">${esc(r.text)}</td></tr>`; }
+    else { tbody += `<tr><td class="label">${esc(r[0])}</td><td class="value">${esc(r[1])}</td></tr>`; }
+  }
+
+  return `
+    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#000;background:#fff;padding:22px 26px;width:100%;max-width:800px;margin:0 auto">
+      <h1 style="text-align:center;font-size:20px;font-weight:800;letter-spacing:2px;margin:0 0 4px;color:#000;text-transform:uppercase">OSINT Intelligence Report</h1>
+      <div style="text-align:center;font-size:11.5px;color:#555;margin:0 0 20px;letter-spacing:1px;text-transform:uppercase">Vehicle → Phone → Aadhaar Intelligence Report</div>
+      <table style="width:100%;border-collapse:collapse;border:1.5px solid #000;table-layout:fixed">
+        <tbody>${tbody}</tbody>
+      </table>
+      <div style="text-align:center;font-size:10px;color:#666;margin-top:20px;letter-spacing:.5px">
+        Report generated ${esc(now)} · Vehicle → Phone → Aadhaar OSINT
+      </div>
+    </div>
+  `;
+}
+
+const PDF_CSS = `
+  #pdfBuilder *{box-sizing:border-box;margin:0;padding:0}
+  #pdfBuilder table{width:100%;border-collapse:collapse;margin:0 auto;border:1.5px solid #000;table-layout:fixed}
+  #pdfBuilder td{padding:6px 10px;border:1px solid #ccc;font-size:11px;line-height:1.5;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word}
+  #pdfBuilder tr.section td{background:#1a1a1a;color:#fff;font-weight:800;text-align:center;font-size:12px;letter-spacing:2px;padding:10px;border-color:#000}
+  #pdfBuilder tr.subsection td{background:#e8e8e8;color:#000;font-weight:700;font-size:11.5px;padding:8px 10px;border-color:#999;letter-spacing:.5px}
+  #pdfBuilder tr.member td{background:#f4f4f4;color:#333;font-weight:700;font-style:italic;font-size:10.5px;padding:5px 10px;border-color:#bbb}
+  #pdfBuilder td.label{width:40%;color:#333;font-weight:600;background:#fafafa}
+  #pdfBuilder td.value{width:60%;color:#000}
+`;
+
+async function downloadReport(){
+  if(!ST.allDone){ alert('Please wait — report is still loading.'); return; }
+  const btn = document.getElementById('downloadBtn');
+  const oldText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Generating PDF...'; }
+
+  try{
+    if(typeof html2pdf === 'undefined'){
+      alert('PDF library not loaded. Check your internet connection — html2pdf.js CDN is required.');
+      if(btn){ btn.disabled = false; btn.textContent = oldText || '📥 Download Full Report (PDF)'; }
+      return;
+    }
+    const html = buildTextReportHTML();
+    let style = document.getElementById('pdfBuilderStyle');
+    if(!style){
+      style = document.createElement('style');
+      style.id = 'pdfBuilderStyle';
+      document.head.appendChild(style);
+    }
+    style.textContent = PDF_CSS;
+
+    const builder = $('pdfBuilder');
+    builder.innerHTML = html;
+
+    await new Promise(r => setTimeout(r, 200));
+
+    const stamp = new Date().toISOString().slice(0,10);
+    const fname = (ST.mode === 'phone' ? 'PhoneAadhaarOSINT_' : 'VehiclePhoneAadhaarOSINT_') + ST.query + '_' + stamp + '.pdf';
+
+    await html2pdf().set({
+      margin: [8, 6, 12, 6],
+      filename: fname,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: 820 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['tr.section','tr.subsection','tr.member','tr'] }
+    }).from(builder.firstElementChild).save();
+
+    log('📥 PDF downloaded (white paper / clean table)', 'ok');
+  }catch(e){
+    console.error('[PDF error]', e);
+    log('❌ PDF failed: ' + (e?.message||e), 'err');
+    alert('PDF failed: ' + (e?.message||e));
+  }finally{
+    const builder = $('pdfBuilder');
+    if(builder) builder.innerHTML = '';
+    const st = document.getElementById('pdfBuilderStyle');
+    if(st) st.remove();
+    if(btn){ btn.disabled = false; btn.textContent = oldText || '📥 Download Full Report (PDF)'; }
+  }
+}
+
+/* ============================================================
+   EVENT BINDINGS
+   ============================================================ */
+window.doSearch = doSearch;
+window.retryPhoneApi = retryPhoneApi;
+window.retryAadharApi = retryAadharApi;
+window.downloadReport = downloadReport;
+window.toggleDebug = toggleDebug;
+window.clearDebug = clearDebug;
+
+document.addEventListener('DOMContentLoaded', function(){
+  console.log('[OSINT] DOM ready — binding events');
+
+  const searchBtn = document.getElementById('searchBtn');
+  if(searchBtn){
+    searchBtn.addEventListener('click', function(e){
+      e.preventDefault();
+      console.log('[OSINT] Search button clicked');
+      doSearch();
+    });
+  }
+
+  const inp = document.getElementById('inp');
+  if(inp){
+    inp.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        console.log('[OSINT] Enter pressed');
+        doSearch();
+      }
+    });
+  }
+
+  document.querySelectorAll('[data-fill]').forEach(el => {
+    el.addEventListener('click', function(){
+      const v = this.getAttribute('data-fill');
+      const input = document.getElementById('inp');
+      if(input) input.value = v;
+      doSearch();
+    });
+  });
+
+  const dbgToggle = document.getElementById('debugToggle');
+  if(dbgToggle) dbgToggle.addEventListener('click', toggleDebug);
+  const dbgClear = document.getElementById('dbgClear');
+  if(dbgClear) dbgClear.addEventListener('click', clearDebug);
+  const dbgClose = document.getElementById('dbgClose');
+  if(dbgClose) dbgClose.addEventListener('click', toggleDebug);
+
+  console.log('[OSINT] All events bound ✓');
+});
+</script>
+</body>
+</html>
